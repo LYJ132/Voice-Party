@@ -1,0 +1,3226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#fff4d6">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Voice Party</title>
+<style>
+/* ===== Cream Pixel Pop Arcade =====
+   paper cream base / green primary / orange accent + danger / blue voice / ink outline */
+:root{
+  --paper:#fff4d6; --panel:#fffcf2; --ink:#40362e; --ink2:#7d6f5e;
+  --green:#82d96b; --green2:#a5ea91; --orange:#ff8b5e; --blue:#a9dcf2;
+  --yellow:#ffe185; --danger:#e2574b;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased; touch-action:manipulation;
+}
+#app{
+  position:fixed;inset:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background:var(--paper);
+}
+#app[data-screen="home"] #readout,#app[data-screen="home"] #distBox,
+#app[data-screen="home"] #pitchbar{display:none}
+#app[data-screen="home"] #game{display:none}
+
+/* ============ SVG icon system ============ */
+.ic{width:18px;height:18px;flex:0 0 auto;display:inline-block;vertical-align:middle;
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ic.sm{width:14px;height:14px}
+.ic.lg{width:22px;height:22px}
+
+/* ============ top bar ============ */
+#top{flex:0 0 auto;padding:6px 12px 2px}
+.toprow{display:flex;align-items:center;gap:10px;min-height:38px}
+.iconbtn{
+  flex:0 0 auto;min-width:40px;height:36px;padding:0 10px;border-radius:10px;
+  border:2px solid var(--ink);background:var(--panel);
+  color:var(--ink);font-size:12px;font-weight:700;letter-spacing:.4px;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+}
+.iconbtn .ic{width:15px;height:15px}
+.iconbtn:active{background:var(--yellow)}
+#readout{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:8px}
+#readout>.ic{color:var(--orange)}
+#readoutText{display:flex;align-items:baseline;gap:8px;min-width:0}
+#hzBig{
+  font-size:26px;font-weight:800;line-height:1;letter-spacing:-.5px;
+  font-variant-numeric:tabular-nums;color:var(--ink);
+}
+#hzBig .unit{font-size:12px;font-weight:700;color:var(--ink2);margin-left:2px}
+#distBox{flex:0 0 auto;display:flex;align-items:center;gap:6px}
+#distBox>.ic{color:var(--orange);width:17px;height:17px}
+#distText{text-align:right}
+#distVal{font-size:20px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--ink)}
+#distLbl{font-size:10px;color:var(--ink2);margin-top:2px}
+#pitchbar{display:block;width:100%;height:44px;margin-top:1px;overflow:hidden}
+
+/* ============ stage & canvas ============ */
+#stage{position:relative;flex:1 1 auto;min-height:0;overflow:hidden}
+#game{
+  position:absolute;display:block;border-radius:16px;touch-action:none;
+  border:3px solid var(--ink);box-shadow:0 6px 0 rgba(64,54,46,.18);
+}
+
+/* ============ home ============ */
+#brand{
+  position:absolute;inset:0;z-index:6;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  text-align:center;pointer-events:none;padding:14px;
+}
+#brand.show{display:flex;animation:brandIn .4s ease both}
+@keyframes brandIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#brandLogo{width:104px;height:84px}
+#brandName{font-size:30px;font-weight:800;letter-spacing:4px;line-height:1.1}
+#brandTag{font-size:11px;letter-spacing:3px;color:var(--ink2);font-weight:600}
+#homeAudio{
+  pointer-events:auto;width:min(88%,320px);margin-top:6px;
+  background:var(--panel);border:3px solid var(--ink);border-radius:14px;
+  padding:12px 14px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;
+  box-shadow:0 5px 0 rgba(64,54,46,.18);
+}
+#homeAudioLbl{font-size:13px;font-weight:700}
+#homeWave{display:flex;align-items:center;gap:4px;height:64px;margin:2px 0}
+#homeWave i{width:7px;border-radius:3px;background:var(--green);border:1px solid var(--ink);height:12px;transition:height .08s linear}
+#homeWave i:nth-child(even){background:var(--blue)}
+#homeWave.live i:nth-child(3n){background:var(--orange)}
+#homeHz{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+#homeHz .unit{font-size:13px;font-weight:700;color:var(--ink2);margin-left:3px}
+#btnMicTest{
+  appearance:none;border:2px solid var(--ink);border-radius:9px;background:#fff;
+  color:var(--ink);font-family:inherit;font-size:13px;font-weight:700;
+  min-height:40px;padding:0 16px;display:inline-flex;align-items:center;gap:7px;
+}
+#btnMicTest:active{background:var(--yellow)}
+#btnMicTest.on{background:var(--green)}
+#btnMicTest .ic{width:15px;height:15px}
+
+/* ============ toast & overlays ============ */
+#toast{
+  position:absolute;left:50%;top:12px;transform:translateX(-50%) translateY(-14px);
+  max-width:88%;padding:8px 14px;border-radius:12px;font-size:13px;
+  background:var(--panel);border:2px solid var(--ink);
+  color:var(--ink);opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;
+  z-index:40;box-shadow:0 5px 0 rgba(64,54,46,.18);text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.bad{border-color:var(--danger);color:var(--danger)}
+#toast.good{border-color:#3e7d2c;color:#3e7d2c}
+
+.ov{
+  position:absolute;inset:0;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;
+  padding:20px 18px;text-align:center;z-index:30;
+  background:rgba(255,244,214,.9);
+}
+.ov.show{display:flex}
+.ov h2{margin:0;font-size:26px;font-weight:800;letter-spacing:-.3px;color:var(--ink)}
+.ov p{margin:0;font-size:13.5px;line-height:1.65;color:var(--ink2);max-width:320px}
+.art{width:66px;height:66px;color:var(--orange)}
+.art.lose{color:var(--danger)}
+.art.calm{color:#4a86c9}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.95}50%{transform:scale(1.07);opacity:1}}
+#ovMic .art{animation:pulse 1.9s ease-in-out infinite}
+
+/* ============ buttons ============ */
+.btn{
+  appearance:none;border:none;border-radius:12px;padding:0 20px;min-height:46px;
+  font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .08s;position:relative;
+}
+.btn .ic{width:19px;height:19px}
+.btn:active{transform:translateY(2px)}
+.btn.primary{
+  background:var(--green);color:var(--ink);border:3px solid var(--ink);
+  box-shadow:0 4px 0 var(--ink);
+}
+.btn.accent{
+  background:var(--orange);color:var(--ink);border:3px solid var(--ink);
+  box-shadow:0 4px 0 var(--ink);
+}
+.btn.ghost{
+  background:var(--panel);border:2px solid var(--ink);color:var(--ink);
+  box-shadow:0 3px 0 rgba(64,54,46,.25);
+}
+.btn.danger{background:#fbe3df;border:2px solid var(--danger);color:var(--danger);box-shadow:0 3px 0 rgba(226,87,75,.3)}
+.btn:disabled{opacity:.45;pointer-events:none;box-shadow:none}
+.btn.sm{min-height:42px;font-size:14px;border-radius:10px;padding:0 14px}
+.btn.sm .ic{width:16px;height:16px}
+.btn.xs{min-height:36px;font-size:12.5px;border-radius:9px;padding:0 11px;gap:5px}
+.btn.xs .ic{width:15px;height:15px}
+.row{display:flex;gap:9px;flex-wrap:wrap;justify-content:center}
+
+/* big mode entries on the home footer */
+.mode-btn{
+  width:100%;appearance:none;border:3px solid var(--ink);border-radius:13px;
+  min-height:64px;padding:10px 16px;cursor:pointer;text-align:left;
+  display:flex;align-items:center;gap:13px;font-family:inherit;
+  box-shadow:0 5px 0 var(--ink);
+}
+.mode-btn:active{transform:translateY(2px);box-shadow:0 3px 0 var(--ink)}
+.mode-btn .ic{width:24px;height:24px;flex:0 0 auto}
+.mode-btn .mb-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mode-btn .mb-main{font-size:17px;font-weight:800;line-height:1.2}
+.mode-btn .mb-key{font-size:11px;font-weight:600;opacity:.75}
+.mode-btn.solo{background:var(--green);color:var(--ink)}
+.mode-btn.duo{background:var(--orange);color:var(--ink)}
+
+/* ============ bottom panels ============ */
+#bottom{flex:0 0 auto;padding:6px 14px 10px;display:flex;flex-direction:column;gap:7px}
+.panel{display:none;flex-direction:column;gap:7px}
+.panel.show{display:flex}
+#footSolo.inplay #segTrack,
+#footSolo.inplay #segDiff2,
+#footSolo.inplay #segSrc,
+#footSolo.inplay .field-label{display:none}
+/* One track row, no separate style row: the pen button itself says which
+   style is drawn ("draw / pipes" or "draw / canyon"), and that is exactly
+   what the studio renders and the game flies. Asking for the style twice on
+   two different screens is what made the two disagree. */
+#footSolo.inplay{gap:6px}
+#footSolo.inplay .hint{opacity:.95}
+.seg{
+  display:flex;gap:4px;padding:3px;border-radius:12px;
+  background:var(--panel);border:2px solid var(--ink);
+}
+.seg button{
+  flex:1 1 0;min-width:0;appearance:none;border:none;border-radius:9px;
+  background:transparent;color:var(--ink2);font-family:inherit;font-size:13px;font-weight:700;
+  min-height:31px;padding:0 4px;white-space:nowrap;overflow:hidden;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  transition:background .16s,color .16s;
+}
+.seg button .ic{width:15px;height:15px;opacity:.8}
+.seg button.on{background:var(--green);color:var(--ink)}
+.seg.accent button.on{background:var(--orange);color:var(--ink)}
+
+.diff-cards{display:flex;gap:7px}
+.diff-card{
+  flex:1 1 0;min-width:0;appearance:none;border:2px solid var(--ink);border-radius:10px;
+  background:var(--panel);color:var(--ink);font-family:inherit;text-align:left;
+  padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:2px;
+}
+.diff-card .dc-name{font-size:13.5px;font-weight:800}
+.diff-card .dc-desc{font-size:10.5px;font-weight:600;color:var(--ink2)}
+.diff-card.on{background:var(--yellow);box-shadow:0 3px 0 var(--ink)}
+
+/* ============ room ============ */
+#roomEntry,#roomActive{display:none;flex-direction:column;gap:9px}
+#roomEntry.show,#roomActive.show{display:flex}
+.room-title{font-size:15px;font-weight:800;text-align:center}
+.room-sub{font-size:11.5px;color:var(--ink2);text-align:center;margin-top:-5px}
+.field-label{font-size:10px;font-weight:700;color:var(--ink2);line-height:1.15}
+#roomBox{
+  border-radius:13px;padding:12px 14px;
+  background:var(--panel);border:2px solid var(--ink);
+  box-shadow:0 4px 0 rgba(64,54,46,.18);
+  display:flex;flex-direction:column;gap:9px;
+}
+#roomCode{
+  font-size:32px;font-weight:800;letter-spacing:7px;text-align:center;color:var(--ink);
+  font-variant-numeric:tabular-nums;padding:2px 0 2px 7px;
+}
+#roomMeta{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;font-size:11px;color:var(--ink2)}
+.pill{
+  padding:3px 9px;border-radius:20px;background:rgba(64,54,46,.06);
+  border:1.5px solid rgba(64,54,46,.25);display:inline-flex;align-items:center;gap:5px;
+}
+.pill .ic{width:12px;height:12px}
+.pill.on{background:rgba(130,217,107,.25);border-color:#3e7d2c;color:#3e7d2c}
+#joinRow{display:flex;gap:8px;align-items:center}
+#joinCode{
+  flex:1 1 auto;min-width:0;height:44px;border-radius:10px;padding:0 14px;
+  border:2px solid var(--ink);background:#fff;
+  color:var(--ink);font-family:inherit;font-size:17px;font-weight:700;letter-spacing:4px;text-align:center;
+  text-transform:uppercase;outline:none;
+}
+#joinCode:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,139,94,.25)}
+.linkrow{display:flex;gap:7px;align-items:center;font-size:11px;color:var(--ink2)}
+.linkrow .ic{width:13px;height:13px;color:#4a86c9}
+.linkrow span{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ============ drawing studio ============
+   Editor controls live in the footer, never on top of the canvas: overlapping
+   controls were exactly what caused the earlier pitch-bar-over-game bug. */
+#footDraw{gap:5px}
+#footDraw .tools,#footDraw .draw-actions{display:flex;gap:5px;align-items:center}
+#footDraw .tools .btn{flex:1 1 0;min-width:0;padding:0 2px;font-size:11px;gap:2px;white-space:nowrap}
+#footDraw .tools .btn .ic{width:12px;height:12px}
+#footDraw .tools .btn.on{background:var(--yellow)}
+/* The studio style button is now a real choice, not a preview: solid border
+   and it stays in sync with the style row on the setup page. */
+#footDraw #btnDrawStyle{border:1.5px solid rgba(64,54,46,.35)}
+#footDraw .draw-nav{min-width:36px;flex:0 0 auto;padding:0 5px}
+#drawSeek{flex:1 1 auto;min-width:0;height:26px;accent-color:#3e7d2c}
+#drawSeekTxt{font-size:10.5px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap}
+#footDraw .hint{font-size:10.5px;line-height:1.35;display:flex;flex-wrap:wrap;gap:4px;align-items:center;justify-content:center}
+/* The spec chip is the single line that says what will actually be flown:
+   difficulty, style, gate spacing. */
+.hint .spec{display:inline-block;padding:1px 6px;border-radius:999px;background:rgba(64,54,46,.08);
+  color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ============ HUD & hints ============ */
+#hud{position:absolute;z-index:2;pointer-events:none;overflow:visible}
+#hud.gHide,#hud .gHide{display:none}
+.hint{font-size:11.5px;color:var(--ink2);text-align:center;line-height:1.5}
+.hint b{color:var(--orange);font-weight:700}
+.hint .ok{color:#3e7d2c;font-weight:700}
+#micRow{display:flex;align-items:center;gap:7px;justify-content:center;font-size:11.5px;color:var(--ink2)}
+#micRow .ic{width:14px;height:14px;color:#4a86c9}
+.dot{width:8px;height:8px;border-radius:50%;background:rgba(64,54,46,.3);flex:0 0 auto}
+.dot.on{background:var(--green);border:1.5px solid #3e7d2c}
+.dot.warn{background:var(--orange);border:1.5px solid var(--danger)}
+</style>
+</head>
+<body>
+<!-- ======================= SVG icon sprite =======================
+     All UI glyphs live here as <symbol>s and are referenced with <use>.
+     Stroke icons inherit currentColor; the logo carries its own gradient. -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <defs>
+    <linearGradient id="lgBird" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#ffe0b0"/>
+      <stop offset=".5" stop-color="#ffb35c"/>
+      <stop offset="1" stop-color="#ff8a2b"/>
+    </linearGradient>
+    <linearGradient id="lgWing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e8893c"/>
+      <stop offset="1" stop-color="#c95f1d"/>
+    </linearGradient>
+  </defs>
+
+  <symbol id="i-logo" viewBox="0 0 64 52">
+    <g fill="#a9dcf2" stroke="#40362e" stroke-width="2.4">
+      <rect x="2" y="24" width="5" height="15"/><rect x="10" y="17" width="5" height="29"/>
+      <rect x="18" y="9" width="5" height="37"/>
+    </g>
+    <g stroke="#40362e" stroke-width="2.4">
+      <rect x="28" y="14" width="22" height="26" fill="#ffe185"/>
+      <rect x="24" y="19" width="30" height="16" fill="#ffe185"/>
+      <rect x="32" y="9" width="14" height="5" fill="#ffe185"/>
+      <rect x="28" y="28" width="14" height="9" fill="#ff8b5e"/>
+      <rect x="45" y="20" width="6" height="6" fill="#fff"/>
+      <rect x="48" y="20" width="3" height="3" fill="#40362e"/>
+      <rect x="53" y="26" width="9" height="5" fill="#ff8b5e"/>
+    </g>
+    <g fill="#ff8b5e" stroke="#40362e" stroke-width="2.4">
+      <rect x="57" y="16" width="5" height="26"/><rect x="63" y="23" width="4" height="12"/>
+    </g>
+  </symbol>
+
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 4 5.7 4 9s-1.4 6.4-4 9c-2.6-2.6-4-5.7-4-9s1.4-6.4 4-9z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M11 4.5 6 9H3v6h3l5 4.5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+  <symbol id="i-bird" viewBox="0 0 24 24"><path d="M16 7h.01"/><path d="M3.4 18H12a8 8 0 0 0 8-8V7a4 4 0 0 0-7.3-2.3L2 20"/><path d="m20 7 2 .5-2 1.5"/></symbol>
+  <symbol id="i-duo" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.2 15.4c2.6.3 4.3 2.1 4.3 4.6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.2-6.8a1 1 0 0 0 0-1.7L9.6 4.3A1 1 0 0 0 8 5.2z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.6" height="14" rx="1.5" fill="currentColor" stroke="none"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-restart" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m4 11 8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.5 5 5 10-11"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7.1 0l2.4-2.4a5 5 0 0 0-7.1-7.1L11 5.9"/><path d="M14 10a5 5 0 0 0-7.1 0l-2.4 2.4a5 5 0 0 0 7.1 7.1L13 18.1"/></symbol>
+  <symbol id="i-leave" viewBox="0 0 24 24"><path d="M14 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8"/><path d="m17 8 4 4-4 4M21 12h-11"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6"/><path d="m6 7 1 13h10l1-13"/><path d="M9 7V4h6v3"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="m4 4 5 5"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><path d="M7 21c0-4.6 2.6-5.7 5-6.5s5-2.1 5-6.5"/><circle cx="7" cy="21" r="1.8"/><circle cx="17" cy="8" r="1.8"/></symbol>
+  <symbol id="i-crash" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.4"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.4 5.4l2.2 2.2M16.4 16.4l2.2 2.2M18.6 5.4l-2.2 2.2M7.6 16.4l-2.2 2.2"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 4c0 9-5 15-13 15-1.6 0-3-.4-3-.4C4 10 9 4 20 4z"/><path d="m4 20 10-10"/></symbol>
+  <symbol id="i-wind" viewBox="0 0 24 24"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4.1 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="m3 8 4 4 5-6 5 6 4-4-2 12H5z"/></symbol>
+</svg>
+
+<div id="app">
+
+  <header id="top">
+    <div class="toprow">
+      <button id="btnBack" class="iconbtn" type="button" aria-label="Home" style="display:none"><svg class="ic"><use href="#i-home"/></svg></button>
+      <button id="btnLang" class="iconbtn" type="button" aria-label="Language"><svg class="ic"><use href="#i-globe"/></svg><span id="langTxt">EN</span></button>
+      <div id="readout">
+        <svg class="ic lg" aria-hidden="true"><use href="#i-wave"/></svg>
+        <div id="readoutText">
+          <div id="hzBig">--<span class="unit">Hz</span></div>
+        </div>
+      </div>
+      <div id="distBox">
+        <svg class="ic" aria-hidden="true"><use href="#i-route"/></svg>
+        <div id="distText">
+          <div id="distVal">0</div>
+          <div id="distLbl" data-i18n="dist">距离</div>
+        </div>
+      </div>
+    </div>
+    <svg id="pitchbar" aria-hidden="true"></svg>
+  </header>
+
+  <main id="stage">
+    <canvas id="game"></canvas>
+
+    <!-- In-game instruments: gate counter + tilt gauge, drawn as SVG so
+         they stay sharp at any device pixel ratio. -->
+    <svg id="hud" viewBox="0 0 400 600" preserveAspectRatio="none" aria-hidden="true">
+      <g id="hudGates">
+        <rect x="288" y="8" width="104" height="26" rx="8" fill="#fffcf2" stroke="#40362e" stroke-width="2"/>
+        <g fill="none" stroke="#40362e" stroke-width="2" stroke-linecap="round">
+          <path d="M298 14v14M307 14v14"/>
+        </g>
+        <text id="hudGatesTxt" x="315" y="27" font-family="system-ui" font-size="13" font-weight="700" fill="#40362e">0</text>
+        <text id="hudGatesLbl" data-i18n="gates" x="340" y="26" font-family="system-ui" font-size="10" fill="#7d6f5e">道门</text>
+      </g>
+      <g id="hudTilt">
+        <rect x="14" y="556" width="116" height="10" rx="5" fill="#fffcf2" stroke="#40362e" stroke-width="2"/>
+        <rect x="71.5" y="552" width="1.6" height="18" fill="#40362e"/>
+        <rect id="hudTiltFill" x="72" y="558.5" width="0" height="5" fill="#3e7d2c"/>
+        <text id="hudTiltTxt" x="14" y="545" font-family="system-ui" font-size="12" font-weight="600" fill="#40362e">θ 0.00</text>
+      </g>
+    </svg>
+
+    <div id="brand">
+      <svg id="brandLogo" viewBox="0 0 64 52" aria-hidden="true"><use href="#i-logo"/></svg>
+      <div id="brandName">Voice Party</div>
+      <div id="brandTag" data-i18n="brandTag">用声音，一起飞</div>
+      <div id="homeAudio">
+        <div id="homeAudioLbl" data-i18n="homeAudioLbl">你的声音，就是翅膀</div>
+        <div id="homeWave" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div id="homeHz"><span id="homeHzVal">--</span><span class="unit" id="homeHzUnit">Hz</span></div>
+        <button id="btnMicTest" type="button"><svg class="ic"><use href="#i-mic"/></svg><span data-i18n="micTest">点一下，试试声音</span></button>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <div class="ov" id="ovEnd">
+      <svg class="art lose" id="endArt" aria-hidden="true"><use id="endArtUse" href="#i-crash"/></svg>
+      <h2 id="endTitle">--</h2>
+      <p id="endSub"></p>
+      <div class="row">
+        <button class="btn primary" id="btnAgain" type="button"><svg class="ic"><use href="#i-restart"/></svg><span id="btnAgainTxt" data-i18n="again">再来一次</span></button>
+        <button class="btn ghost" id="btnHome" type="button"><svg class="ic"><use href="#i-home"/></svg><span data-i18n="home">回首页</span></button>
+      </div>
+    </div>
+
+    <div class="ov" id="ovPause">
+      <svg class="art calm" aria-hidden="true"><use href="#i-pause"/></svg>
+      <h2 data-i18n="paused">已暂停</h2>
+      <p data-i18n="pauseHint">暂停期间画面冻结，恢复后继续</p>
+      <div class="row">
+        <button class="btn primary" id="btnResume" type="button"><svg class="ic"><use href="#i-play"/></svg><span data-i18n="resume">继续</span></button>
+        <button class="btn ghost" id="btnRestart" type="button"><svg class="ic"><use href="#i-restart"/></svg><span data-i18n="restart">重来</span></button>
+      </div>
+    </div>
+
+    <div class="ov" id="ovMic">
+      <svg class="art" aria-hidden="true"><use href="#i-mic"/></svg>
+      <h2 data-i18n="micNeedTitle">需要麦克风</h2>
+      <p id="micMsg" data-i18n="micNeedBody">这个游戏用声音控制飞行，请在下方允许使用麦克风。</p>
+      <div class="row">
+        <button class="btn primary" id="btnMicRetry" type="button"><svg class="ic"><use href="#i-mic"/></svg><span data-i18n="micRetry">开启麦克风</span></button>
+        <button class="btn ghost" id="btnMicLater" type="button"><svg class="ic"><use href="#i-play"/></svg><span data-i18n="micLater">先跳过</span></button>
+      </div>
+    </div>
+
+  </main>
+
+  <footer id="bottom">
+
+    <div class="panel show" id="footHome">
+      <button class="mode-btn solo" id="btnSolo" type="button">
+        <svg class="ic"><use href="#i-bird"/></svg>
+        <span class="mb-txt"><span class="mb-main" data-i18n="solo">单人</span><span class="mb-key" data-i18n="soloKey">选好赛道和难度再起飞</span></span>
+      </button>
+      <button class="mode-btn duo" id="btnRoom" type="button">
+        <svg class="ic"><use href="#i-duo"/></svg>
+        <span class="mb-txt"><span class="mb-main" data-i18n="createRoom">创建房间</span><span class="mb-key" data-i18n="duoKey">和朋友一起控制小鸟</span></span>
+      </button>
+      <div id="micRow"><svg class="ic"><use href="#i-mic"/></svg><span class="dot" id="micDot"></span><span id="micLabel">--</span></div>
+    </div>
+
+    <div class="panel" id="footSolo">
+      <div class="field-label" data-i18n="lblTrack">赛道</div>
+      <div class="seg" id="segTrack">
+        <button type="button" data-v="random" class="on"><svg class="ic"><use href="#i-route"/></svg><span data-i18n="randomTrack">随机赛道</span></button>
+        <button type="button" data-v="custom"><svg class="ic"><use href="#i-pen"/></svg><span id="trackCustomTxt" data-i18n="customTrack">自己绘制</span></button>
+        <button type="button" data-v="spikes"><svg class="ic"><use href="#i-flame"/></svg><span data-i18n="spikeTrack">锯齿峡谷</span></button>
+      </div>
+      <div class="field-label" data-i18n="lblDiff">难度</div>
+      <div class="seg accent" id="segDiff2">
+        <button type="button" data-v="easy" class="on"><svg class="ic"><use href="#i-leaf"/></svg><span data-i18n="easy">简单</span></button>
+        <button type="button" data-v="normal"><svg class="ic"><use href="#i-wind"/></svg><span data-i18n="normal">普通</span></button>
+        <button type="button" data-v="hard"><svg class="ic"><use href="#i-flame"/></svg><span data-i18n="hard">困难</span></button>
+      </div>
+      <div class="field-label" data-i18n="lblCtrl">声音控制</div>
+      <div class="seg" id="segSrc">
+        <button type="button" data-v="pitch" class="on"><svg class="ic"><use href="#i-wave"/></svg><span data-i18n="pitch">音调</span></button>
+        <button type="button" data-v="volume"><svg class="ic"><use href="#i-speaker"/></svg><span data-i18n="volume">音量</span></button>
+      </div>
+      <div class="hint" id="ctrlHint"></div>
+      <button class="btn accent" id="btnMain" type="button"><svg class="ic"><use id="mainIcon" href="#i-play"/></svg><span id="mainTxt">开始</span></button>
+    </div>
+
+    <div class="panel" id="footDraw">
+      <div class="tools">
+        <button class="btn ghost xs" id="btnDrawStyle" type="button" title="Switch track style"><svg class="ic"><use id="drawStyleIcon" href="#i-route"/></svg><span id="drawStyleTxt" data-i18n="stylePipes">管道</span></button>
+        <button class="btn ghost xs" id="btnUndo" type="button"><svg class="ic"><use href="#i-undo"/></svg><span data-i18n="undo">撤销</span></button>
+        <button class="btn ghost xs" id="btnClear" type="button"><svg class="ic"><use href="#i-trash"/></svg><span data-i18n="clear">清空</span></button>
+        <button class="btn ghost xs" id="btnRand" type="button"><svg class="ic"><use href="#i-shuffle"/></svg><span data-i18n="randTrack">随机生成</span></button>
+      </div>
+      <div class="draw-actions">
+        <button class="btn ghost xs draw-nav" id="btnExtend" type="button" aria-label="Extend">+</button>
+        <button class="btn ghost xs draw-nav" id="btnDrawPrev" type="button" aria-label="Previous">&#9664;</button>
+        <input id="drawSeek" type="range" min="0" max="800" value="0" step="1" aria-label="Canvas position">
+        <button class="btn ghost xs draw-nav" id="btnDrawNext" type="button" aria-label="Next">&#9654;</button>
+        <button class="btn primary xs" id="btnDone" type="button"><svg class="ic"><use href="#i-check"/></svg><span data-i18n="done">完成</span></button>
+      </div>
+      <!-- The spec chip states EXACTLY what will be flown: style, gate spacing
+           and count, all derived from the difficulty picked on the setup page.
+           The studio preview is the track, never a lookalike. -->
+      <div class="hint"><span id="drawSpecTxt" class="spec">--</span><span data-i18n="drawHint">从左往右画 · 右边缘自动延长</span><span id="drawSeekTxt">1 / 3</span></div>
+    </div>
+
+    <div class="panel" id="footRoom">
+      <div id="roomEntry">
+        <div class="room-title" data-i18n="roomEntryTitle">和朋友一起飞</div>
+        <div class="room-sub" data-i18n="roomEntrySub">先商量好赛道与难度，再各自准备</div>
+        <div class="field-label" data-i18n="lblTrack">赛道</div>
+        <div class="seg" id="segRoomTrack">
+          <button type="button" data-v="random" class="on"><svg class="ic"><use href="#i-route"/></svg><span data-i18n="randomTrack">随机赛道</span></button>
+          <button type="button" data-v="spikes"><svg class="ic"><use href="#i-flame"/></svg><span data-i18n="spikeTrack">锯齿峡谷</span></button>
+        </div>
+        <div class="field-label" data-i18n="lblDiff">难度</div>
+        <div class="seg accent" id="segRoomDiff">
+          <button type="button" data-v="easy" class="on"><svg class="ic"><use href="#i-leaf"/></svg><span data-i18n="easy">简单</span></button>
+          <button type="button" data-v="normal"><svg class="ic"><use href="#i-wind"/></svg><span data-i18n="normal">普通</span></button>
+          <button type="button" data-v="hard"><svg class="ic"><use href="#i-flame"/></svg><span data-i18n="hard">困难</span></button>
+        </div>
+        <div class="field-label" data-i18n="lblCtrl">声音控制</div>
+        <div class="seg" id="segRoomSrc">
+          <button type="button" data-v="pitch" class="on"><svg class="ic"><use href="#i-wave"/></svg><span data-i18n="pitch">音调</span></button>
+          <button type="button" data-v="volume"><svg class="ic"><use href="#i-speaker"/></svg><span data-i18n="volume">音量</span></button>
+        </div>
+        <div id="joinRow" style="display:none">
+          <input id="joinCode" type="text" inputmode="latin" autocomplete="off" maxlength="6" placeholder="CODE" data-i18n-ph="codePh">
+          <button class="btn primary sm" id="btnJoin" type="button"><svg class="ic"><use href="#i-check"/></svg><span data-i18n="join">加入</span></button>
+        </div>
+        <div class="row">
+          <button class="btn primary sm" id="btnCreateNow" type="button"><svg class="ic"><use href="#i-duo"/></svg><span data-i18n="createNow">创建房间</span></button>
+          <button class="btn ghost sm" id="btnShowJoin" type="button"><svg class="ic"><use href="#i-link"/></svg><span data-i18n="joinRoom">加入房间</span></button>
+        </div>
+      </div>
+
+      <div id="roomActive">
+        <div id="roomBox">
+          <div id="roomCode">------</div>
+          <div id="roomMeta">
+            <span class="pill" id="pillRole">--</span>
+            <span class="pill" id="pillSrc">--</span>
+            <span class="pill" id="pillA">--</span>
+            <span class="pill" id="pillB">--</span>
+          </div>
+          <div class="linkrow"><svg class="ic"><use href="#i-link"/></svg><span id="shareUrl">--</span></div>
+        </div>
+        <div class="hint" id="roomBrief"></div>
+        <div class="row">
+          <button class="btn ghost sm" id="btnCopy" type="button"><svg class="ic"><use href="#i-copy"/></svg><span data-i18n="copyLink">复制链接</span></button>
+          <button class="btn ghost" id="btnLeave" type="button"><svg class="ic"><use href="#i-leave"/></svg><span data-i18n="leave">离开</span></button>
+        </div>
+        <div class="row">
+          <button class="btn ghost" id="btnReady" type="button"><svg class="ic"><use href="#i-check"/></svg><span id="btnReadyTxt" data-i18n="ready">准备</span></button>
+          <button class="btn accent" id="btnRoomStart" type="button"><svg class="ic"><use href="#i-play"/></svg><span data-i18n="startGame">开始</span></button>
+        </div>
+        <div class="hint" id="roomHint"></div>
+      </div>
+    </div>
+
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   Voice Party — mobile client (V1)
+   Single file. Portrait, single screen, no scrolling.
+   Two entries only: Solo / Create Room. A room holds exactly two players.
+   Control source: pitch -> slide direction (rise=climb, fall=dive, hold=level)
+                   volume -> louder than the first sound = climb (+gravity solo)
+   Duo: A lifts (higher/louder voice), B pushes down (higher/louder voice),
+   no gravity. Both share one bird; the server phase drives BOTH screens and
+   the guest renders the host's state.
+   ========================================================================= */
+
+/* DUO_ENABLED=false temporarily gates the two-player room feature (btnRoom entry + ?room= invite auto-join); flip it to true here to re-enable. */
+const DUO_ENABLED=false;
+
+/* ============================ i18n ============================ */
+const T={
+  zh:{
+    appName:'声音派对', brandTag:'用声音，一起飞', dist:'距离', gates:'道门', solo:'单人', soloKey:'选好赛道和难度再起飞', duoKey:'和朋友一起控制小鸟',
+    createRoom:'双人联机', joinRoom:'加入房间', devSoon:'双人联机正在打磨中，敬请期待',
+    lblTrack:'赛道', lblDiff:'难度', lblCtrl:'声音控制', spikeTrack:'锯齿峡谷',
+    stylePipes:'管道', styleSpikes:'锯齿峡谷',
+    previewPipes:'管道', previewSpikes:'锯齿峡谷', randTrack:'随机生成', randDone:'已生成随机赛道',
+    homeAudioLbl:'你的声音，就是翅膀',
+    micTest:'点一下，试试声音',
+    roomEntryTitle:'和朋友一起飞', roomEntrySub:'先商量好赛道与难度，再各自准备', createNow:'创建房间',
+    leave:'离开', copyLink:'复制链接', copied:'链接已复制', copyFail:'复制失败，请手动复制',
+    ready:'准备', notReady:'取消准备', startGame:'开始', again:'再来一次', home:'回首页',
+    easy:'简单', normal:'普通', hard:'困难', pitch:'音调', volume:'音量',
+    randomTrack:'随机赛道', customTrack:'自己绘制',
+    customPipes:'绘制·管道', customCanyon:'绘制·峡谷',
+    paused:'已暂停', pause:'暂停', resume:'继续', restart:'重来',
+    pauseHint:'暂停期间画面冻结，恢复后继续', undo:'撤销', clear:'清空', done:'完成', random:'随机',
+    micNeedTitle:'需要麦克风', micNeedBody:'这个游戏用声音控制飞行，请在下方允许使用麦克风。',
+    micRetry:'开启麦克风', micLater:'先跳过', micOn:'麦克风已开启', micBlocked:'麦克风未授权',
+    micFail:'麦克风打开失败，请检查权限', micNeed:'当前环境无法使用麦克风（需要 https 或 localhost）',
+    hintPitch:'<b>升调抬头 · 降调低头 · 停住拉平</b>',
+    hintVolume:'<b>比你第一声更响 → 抬头，更轻 → 低头；停下会下沉</b>',
+    duoBriefPitch:'<b>主方(A)：声调越高，小鸟越升 · 客方(B)：声调越高，小鸟越降</b>',
+    duoBriefVolume:'<b>主方(A)：音量越大，小鸟越升 · 客方(B)：音量越大，小鸟越降</b>',
+    duoHintPitch:'主方声调高→小鸟升 · 客方声调高→小鸟降',
+    duoHintVolume:'主方音量大→小鸟升 · 客方音量大→小鸟降',
+    duoHost:'主', duoGuest:'客',
+    toRoom:'回到房间', waitHost:'等待房主操作…', peerLeft:'对方已离开房间',
+    hintRoom:'<b>等对方进来后，双方都点「准备」</b>',
+    roomWait:'等待对方加入…把房间码或链接发给朋友',
+    roomHost:'你是房主', roomGuest:'你是客人', roomA:'A', roomB:'B',
+    joined:'已加入', notJoined:'未加入', isReady:'已准备', notReadyState:'未准备',
+    needTwo:'需要两个人才能开始', allReady:'双方都准备好了', canStart:'可以开始了',
+    roomFull:'房间已满', roomNotFound:'房间不存在', roomClosed:'房间已关闭',
+    roomFail:'房间服务连接失败', connecting:'连接中…', offline:'已断开连接',
+    roomBlocked:'无法访问房间服务，请确认链接完整（含分享码）后重试',
+    roomHttp:'房间服务返回异常，请稍后再试',
+    roomToken:'房间会话已失效，请重新加入',
+    drawHint:'从左往右画 · 右边缘自动延长', specSaved:'已保存',
+    drawForward:'只能从左往右画', drawReturn:'回程',
+    drawDone:'赛道已保存', needDraw:'请先画一条赛道',
+    crashed:'撞到了', loseSub:'飞行 {d} 米 · 穿过 {s} 道门',
+    netOn:'联机中', netOff:'未联机',
+    codePh:'房间码', join:'加入', joinFail:'加入失败',
+    micDenied:'麦克风被拒绝，请在浏览器设置里允许',
+    micHint:'点「单人」或「创建房间」开启麦克风',
+    countGo:'开始！'
+  },
+  en:{
+    appName:'Voice Party', brandTag:'Fly together with your voice', dist:'Distance', gates:'gates', solo:'Solo', soloKey:'Pick a track and difficulty', duoKey:'Steer one bird with a friend',
+    createRoom:'Two Players', joinRoom:'Join Room', devSoon:'Two-player mode is coming soon',
+    lblTrack:'Track', lblDiff:'Difficulty', lblCtrl:'Voice control', spikeTrack:'Spike Canyon',
+    stylePipes:'Pipes', styleSpikes:'Spike Canyon',
+    previewPipes:'Pipes', previewSpikes:'Spike Canyon', randTrack:'Randomize', randDone:'Random track ready',
+    homeAudioLbl:'Your voice is the wings',
+    micTest:'Tap to test your voice',
+    roomEntryTitle:'Fly with a friend', roomEntrySub:'Agree on a track and difficulty, then get ready', createNow:'Create Room',
+    leave:'Leave', copyLink:'Copy Link', copied:'Link copied', copyFail:'Copy failed, copy manually',
+    ready:'Ready', notReady:'Cancel', startGame:'Start', again:'Try Again', home:'Home',
+    easy:'Easy', normal:'Normal', hard:'Hard', pitch:'Pitch', volume:'Volume',
+    randomTrack:'Random Track', customTrack:'Draw Your Own',
+    customPipes:'Draw·Pipes', customCanyon:'Draw·Canyon',
+    paused:'Paused', pause:'Pause', resume:'Resume', restart:'Restart',
+    pauseHint:'Game is frozen while paused', undo:'Undo', clear:'Clear', done:'Done', random:'Random',
+    micNeedTitle:'Microphone needed', micNeedBody:'This game steers the bird with your voice. Allow microphone access below.',
+    micRetry:'Enable Mic', micLater:'Later', micOn:'Microphone on', micBlocked:'Mic not allowed',
+    micFail:'Could not open the microphone, check permissions', micNeed:'Microphone unavailable here (needs https or localhost)',
+    hintPitch:'<b>Slide up = climb · slide down = dive · hold = level</b>',
+    hintVolume:'<b>Louder than your first sound = climb, quieter = dive; stop and you sink</b>',
+    duoBriefPitch:'<b>Host (A): higher pitch lifts the bird · Guest (B): higher pitch sinks it</b>',
+    duoBriefVolume:'<b>Host (A): louder voice lifts the bird · Guest (B): louder voice sinks it</b>',
+    duoHintPitch:'P1 higher pitch = up · P2 higher pitch = down',
+    duoHintVolume:'P1 louder = up · P2 louder = down',
+    duoHost:'P1', duoGuest:'P2',
+    toRoom:'Back to Room', waitHost:'Waiting for the host…', peerLeft:'Your partner left the room',
+    hintRoom:'<b>Once your friend joins, both tap “Ready”</b>',
+    roomWait:'Waiting for a friend — send them the code or link',
+    roomHost:'You are the host', roomGuest:'You are the guest', roomA:'A', roomB:'B',
+    joined:'Joined', notJoined:'Empty', isReady:'Ready', notReadyState:'Not ready',
+    needTwo:'Two players needed', allReady:'Both are ready', canStart:'You can start',
+    roomFull:'Room is full', roomNotFound:'Room not found', roomClosed:'Room closed',
+    roomFail:'Cannot reach the room server', connecting:'Connecting…', offline:'Disconnected',
+    roomBlocked:'Cannot reach the room service — check that the full link (with its share code) is used',
+    roomHttp:'The room service returned an error — please try again',
+    roomToken:'This room session expired — please join again',
+    drawHint:'Left to right · the edge auto-extends', specSaved:'saved',
+    drawForward:'Draw left to right only', drawReturn:'Return',
+    drawDone:'Track saved', needDraw:'Draw a track first',
+    crashed:'Crashed', loseSub:'Flew {d} m · passed {s} gates',
+    netOn:'Online', netOff:'Offline',
+    codePh:'CODE', join:'Join', joinFail:'Join failed',
+    micDenied:'Microphone denied — allow it in your browser settings',
+    micHint:'Tap Solo or Create Room to enable the microphone',
+    countGo:'Go!'
+  }
+};
+let LANG='zh';
+const tr=k=>(T[LANG]&&T[LANG][k])||(T.zh[k]||k);
+
+/* ============================ layout config ============================ */
+const LOG={W:400,H:600};
+/* The world is 400x600, but the window shows the middle VIEWH of it. That
+   lets the canvas use the full screen width: a phone stage is wider than
+   400:480, so the spare width becomes play area instead of empty margin.
+   Every coordinate stays in world space, so nothing else has to change. */
+const VIEWH=480;
+const VIEWY0=(LOG.H-VIEWH)/2;
+const CFG={
+  W:LOG.W, H:LOG.H,
+  birdX:92, birdR:12,
+  vx:120, baseLift:250, maxAngleDeg:32,
+  /* loopLen is NOT a course length. It is the period of the centerline:
+     the channel repeats seamlessly every loopLen pixels, so the track can
+     run forever. There is no finish line anywhere in the game. */
+  loopLen:3000,
+  /* Denser gate spacing: one screen now shows 1.5-2.3 gates instead of
+     1.2-1.7, which is what makes the course read as a track rather than a
+     corridor. Speed is scaled down with it so the time per gate stays close
+     to the old feel. */
+  gapX:{easy:240,normal:190,hard:158},
+  /* Gate half-height and the legal drop between neighbours are ONE decision.
+     The opening itself is 2*halfW (easy 240 / normal 164 / hard 132 - at least
+     5x the 24px bird), but two neighbouring gates are only allowed to OVERLAP
+     by gateMinOverlap (14px). Their centre distance is the ladder rung
+     224 / 149.3 / 112, i.e. a few px more than the 2*halfW-24 a 24px bird
+     occupies, so no horizontal line can thread two gates: the player must
+     climb or dive at every gate. The rung is also <= 2*halfW-14, so the two
+     openings still overlap and no pair is ever impossible to reach. */
+  halfW:{easy:120,normal:82,hard:66},
+  /* A hand-drawn strip is mapped WYSIWYG: each gate takes the height the
+     stroke drew at its position, and the only rewrite is a soft clamp to the
+     playable band (sample -> band clamp -> mirror, see customKeys). There is
+     no reach clamp and no anti-level-flight rule on custom tracks: a flat
+     stroke produces a flat track and a steep zigzag is kept verbatim. Custom
+     pipes share the built-in halfW per difficulty, so their openings are
+     240/164/132 - exactly like the random track. */
+  speed:{easy:92,normal:108,hard:126},
+  /* Deep but SLOW teeth: the pinch is twice the amplitude, so 22 reads
+     clearly against the 480px window. The period is long (56px) and the
+     triangle is smoothstepped in canyonAt(), so the walls undulate instead
+     of sawing every 13px - that fast sawing read as the canyon shaking. */
+  spikeAmp:22, spikePeriod:56,
+  /* Canyon corridors use the same rule as the pipes: index change between two
+     gates exceeds the bird, while the narrowest passage stays 88-136px. */
+  spikeHalfW:{easy:90,normal:82,hard:66},
+  /* Neighbouring openings may overlap by only this much. It MUST stay below
+     the bird diameter (24px), otherwise a level flight threads both gates. */
+  gateMinOverlap:14,
+  /* The canyon always keeps at least this much room between its walls. */
+  spikeMinPass:40,
+  /* A wide flat mouth with a green gate, then a smooth funnel into the teeth.
+     Everything at or beyond spikeEntryEnd is the full canyon. */
+  spikeEntryHW:210,
+  spikeEntryDoorX:430, spikeEntryDoorW:56, spikeEntryEnd:620,
+  /* Hand-drawn tracks are a paper strip of arbitrary length; the editor grows
+     it one viewport at a time, up to 24 screens. */
+  drawMaxLen:9600,
+  gateW:56, gateStart:430,
+  gravity:230, vFallMax:150,
+  span:{pitch:2.2, volume:7},
+  baseSpan:8,
+  buffer:0.45
+};
+const MDT=1/60, MFPS=60;
+const mclamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+/* ============================ state ============================ */
+const S={
+  screen:'home',      /* home | solo | room | draw */
+  play:'idle',        /* idle | calib | playing | paused | over */
+  diff:'easy',
+  input:'pitch',      /* pitch | volume */
+  track:'random',     /* random | custom | spikes */
+  gain:1,
+  mode:'solo'         /* solo | duo */
+};
+const G={
+  x:0,y:LOG.H/2,theta:0,vy:0,vFall:0,
+  score:0,dist:0,camX:0,
+  centerline:null,
+  /* One height per GATE - the single source of truth for a track. */
+  keys:null, keyGap:0,
+  loopLen:3000,       /* period of lineAt(): keys.length * keyGap */
+  stepCount:0, over:false, overMsg:'', calibT:0,
+  seed:(Date.now()>>>0)||1
+};
+const A={
+  ctx:null,stream:null,analyser:null,buf:null,ds:null,acf:null,cmn:null,
+  ready:false,micAsked:false,micState:'off',
+  hz:0,hzRaw:0,clarity:0,rms:0,noiseFloor:0.004,gate:0.010,
+  pitchState:'silent',meterVal:null,meterHist:[],hzBuf:[],
+  holdHz:0,holdCount:0,jumpsHeld:0,silentTime:0,
+  lastA:null,voiceA:false,val:null,
+  base:null,baseBuf:[],dev:0,
+  ref:null,valS:null,slide:0,
+  cand:[],conflict:false,hpReady:false
+};
+const NET={
+  code:null,token:null,role:null,room:null,
+  phase:'lobby',startAt:0,startedAt:0,
+  lastSend:0,online:false,clockOffset:0,
+  myReady:false,remoteA:0,remoteB:0,rx:null,busy:false,hintUntil:0
+};
+const UI={
+  /* customLine/previewLine are the GATE KEY arrays (one height per gate), not
+     dense centreline samples: the gates are the course. */
+  drawPts:[],drawing:false,customLine:null,previewLine:null,freshFrom:null,
+  customGap:0,previewGap:0,customPeriod:0,previewPeriod:0,micLater:false,
+  dirty:false,
+  /* WYSIWYG studio state: the pointer that owns the stroke, the one-level
+     undo snapshot, and the index of the first stroke point that has not been
+     smoothed+settled yet (everything before it is frozen forever). */
+  drawPointerId:null, drawUndo:null, smoothedUpTo:0,
+  /* V1.6 drawing studio: world-space paper strip + its viewport offset. */
+  drawLen:1200, drawScroll:0, lastPointer:null,
+  /* Auto-smooth is not optional: the bird only flies forward. */
+  autoSmooth:true, smoothWarned:false,
+  customStyle:'pipes', customLoopLen:3000,
+  /* Alias of customStyle: the studio preview IS the track, so there is no
+     second style that could drift. */
+  drawPreviewStyle:'pipes',
+  strokeSaved:false, savedTrack:''
+};
+/* `play` and `paused` are accessors: changing either one has to refresh the
+   chrome immediately (button label, collapsed setup rows, canvas height).
+   Deriving that in the render loop instead would leave a one-frame window
+   where the UI still showed the previous state. */
+let _play='idle', _paused=false;
+Object.defineProperty(S,'play',{
+  get(){ return _play; },
+  set(v){ if(v===_play) return; _play=v; syncPlayUI(); }
+});
+Object.defineProperty(UI,'paused',{
+  get(){ return _paused; },
+  set(v){ if(v===_paused) return; _paused=v; syncPlayUI(); }
+});
+
+/* ============================ dom ============================ */
+const $=id=>document.getElementById(id);
+const game=$('game'), gx=game.getContext('2d');
+const pbar=$('pitchbar');   // an <svg>; drawPitchbar() updates its attributes
+
+let toastTimer=0;
+/* A toast stores its i18n KEY, not the rendered text, so switching the
+   language re-renders it instead of leaving a stale foreign sentence on
+   screen for a couple of seconds. */
+const UI_T={key:null,kind:''};
+function toast(key,kind){
+  UI_T.key = (typeof key==='string' && Object.prototype.hasOwnProperty.call(T.zh,key)) ? key : null;
+  UI_T.kind = kind||'';
+  renderToast();
+}
+function renderToast(){
+  const t=$('toast');
+  t.innerHTML = UI_T.key ? tr(UI_T.key) : '';
+  t.className='show'+(UI_T.kind?' '+UI_T.kind:'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{ t.className=''; },2400);
+}
+function serverNow(){ return Date.now()+NET.clockOffset; }
+
+/* Buttons carry an SVG icon next to a text span, so label changes must never
+   touch the button's own textContent (that would wipe the glyph). */
+function setMainBtn(key,icon){
+  $('mainTxt').textContent=tr(key);
+  if(icon) $('mainIcon').setAttribute('href',icon);
+}
+function setScreen(name){
+  S.screen=name;
+  $('app').dataset.screen=name;
+  $('btnBack').style.display=name==='home'?'none':'';
+  $('footHome').classList.toggle('show',name==='home');
+  $('footSolo').classList.toggle('show',name==='solo');
+  $('footDraw').classList.toggle('show',name==='draw');
+  $('footRoom').classList.toggle('show',name==='room');
+  $('brand').classList.toggle('show',name==='home');
+  if(name==='draw'){ updateDrawStyleBtn(); refreshBothLines(); }
+  updateDrawChrome();
+  /* The home screen is a clean brand page: no canvas behind the audio tester.
+     Gameplay screens bring the canvas back and re-measure it. */
+  game.style.display=name==='home'?'none':'';
+  updateRoomUI();
+  /* Overlays belong to the solo screen only: leaving solo (e.g. into the draw
+     studio) must hide them, or the game-over panel covers the editor. */
+  $('ovEnd').classList.toggle('show',S.play==='over'&&name==='solo');
+  $('ovPause').classList.toggle('show',UI.paused&&name==='solo');
+  $('ovMic').classList.toggle('show',A.micAsked&&!A.ready&&!UI.micLater&&name!=='home'&&name!=='draw');
+  $('distLbl').textContent=tr('dist');
+  $('langTxt').textContent=LANG==='zh'?'EN':'中';
+  /* The bottom panel changes height between screens (the room panel is much
+     taller than the home panel). The canvas is centred inside the stage, so
+     it MUST be re-measured afterwards — otherwise it keeps the old height and
+     its lower part is hidden behind the footer while collisions still use the
+     full world. */
+  syncPlayUI();
+  refreshHints();
+}
+/* The primary button means different things depending on the run state, so
+   its label and icon are derived from the state rather than set ad hoc.
+   (It used to read "Restart" while the game was running, but tapping it
+   paused the game — the label and the behaviour disagreed.) */
+function syncMainBtn(){
+  /* Always refresh, even off the solo screen: the button keeps its text when
+     hidden, and a stale translation would resurface the moment the screen
+     comes back or the language is switched. */
+  if(S.play==='playing'||S.play==='calib') setMainBtn('pause','#i-pause');
+  else if(S.play==='paused') setMainBtn('resume','#i-play');
+  else if(S.play==='over') setMainBtn('restart','#i-restart');
+  else setMainBtn('startGame','#i-play');
+}
+/* During a run the setup rows (track / difficulty / control source) are
+   locked: changing the difficulty would not rebuild the obstacles, so the
+   selector would lie. Collapsing them also hands their height back to the
+   play area, which matters on a phone. */
+function syncPlayUI(){
+  const inPlay=S.screen==='solo'&&(S.play==='playing'||S.play==='calib'||S.play==='paused');
+  $('footSolo').classList.toggle('inplay',inPlay);
+  /* While the pause overlay is up it already offers "Resume" and "Restart",
+     so the footer button would be a duplicate — hide it and give the stage
+     the extra room instead. */
+  $('btnMain').style.display=(S.screen==='draw'||S.play==='paused')?'none':'';
+  syncMainBtn();
+  layout();
+}
+function refreshHints(){
+  const h=$('ctrlHint');
+  if(S.screen==='draw'){ h.innerHTML=tr('drawHint'); return; }
+  /* The room screen shows the full briefing in #roomBrief; this hint element
+     is only visible on the solo setup sheet. */
+  if(S.screen==='room'){ h.innerHTML=S.mode==='duo'?tr(S.input==='volume'?'duoBriefVolume':'duoBriefPitch'):tr('hintRoom'); return; }
+  if(S.mode==='duo'){ h.innerHTML=tr(S.input==='volume'?'duoBriefVolume':'duoBriefPitch'); return; }
+  h.innerHTML=S.input==='volume'?tr('hintVolume'):tr('hintPitch');
+}
+
+/* ============================ audio core ============================ */
+const PITCH_MIN=60, PITCH_MAX=1050;
+const PREEMPH=0.85;
+
+async function enableMic(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    A.micAsked=true; UI.micLater=false; setScreen(S.screen);
+    toast('micNeed','bad');
+    return false;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation:false,noiseSuppression:false,autoGainControl:false
+    },video:false});
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    const ctx=new Ctx();
+    if(ctx.state==='suspended') await ctx.resume();
+    const src=ctx.createMediaStreamSource(stream);
+    const an=ctx.createAnalyser();
+    an.fftSize=2048; an.smoothingTimeConstant=0;
+    let tail=src; A.hpReady=false;
+    try{
+      const hp=ctx.createBiquadFilter();
+      hp.type='highpass'; hp.frequency.value=75; hp.Q.value=0.7;
+      src.connect(hp); tail=hp; A.hpReady=true;
+    }catch(e){ A.hpReady=false; }
+    tail.connect(an);
+    A.ctx=ctx; A.stream=stream; A.analyser=an;
+    A.buf=new Float32Array(an.fftSize);
+    A.ds=new Float32Array(an.fftSize>>1);
+    A.acf=new Float32Array(Math.floor((ctx.sampleRate/2)/55)+4);
+    A.cmn=new Float32Array(A.acf.length);
+    A.ready=true; A.micAsked=true; UI.micLater=false; A.micState='on';
+    A.hz=0;A.hzRaw=0;A.meterVal=null;A.meterHist=[];
+    A.holdHz=0;A.holdCount=0;A.jumpsHeld=0;A.silentTime=0;A.pitchState='silent';
+    $('micDot').className='dot on';
+    $('micLabel').textContent=tr('micOn');
+    setScreen(S.screen);
+    return true;
+  }catch(e){
+    A.ready=false; A.micAsked=true; A.micState='blocked';
+    $('micDot').className='dot warn';
+    $('micLabel').textContent=tr('micBlocked');
+    setScreen(S.screen);
+    toast('micDenied','bad');
+    return false;
+  }
+}
+
+/* YIN / CMNDF with multi-candidate disambiguation. Plain autocorrelation
+   locks onto multiples of the true period (octave-down errors); a real mic
+   frame also holds several plausible dips at once (fundamental, harmonic,
+   room rumble, a second voice). Every dip is scored, the winner is picked by
+   clarity + continuity with the last stable tone. */
+function detectPitch(buf,sr){
+  const N=buf.length;
+  let sum=0,mean=0;
+  for(let i=0;i<N;i++){ sum+=buf[i]*buf[i]; mean+=buf[i]; }
+  const rms=Math.sqrt(sum/N); mean/=N;
+  if(rms<A.gate) return {hz:0,clarity:0,rms,cands:[],conflict:false};
+  const M=N>>1, ds=A.ds, W=512;
+  for(let i=0;i<M;i++) ds[i]=(buf[2*i]+buf[2*i+1])*0.5-mean;
+  /* pre-emphasis y[n]=a*(y[n-1]+x[n]-x[n-1]): kills rumble that is louder
+     than the voice fundamental without hurting real low notes */
+  { let px0=ds[0], py=0;
+    for(let i=0;i<M;i++){ const x=ds[i]; py=PREEMPH*(py+x-px0); px0=x; ds[i]=py; } }
+  const sr2=sr/2;
+  const minLag=Math.max(2,Math.floor(sr2/PITCH_MAX));
+  const maxLag=Math.min(Math.floor(sr2/PITCH_MIN),M-W-1,A.acf.length-2);
+  if(maxLag<=minLag) return {hz:0,clarity:0,rms,cands:[],conflict:false};
+  const diff=A.acf, cm=A.cmn;
+  for(let lag=0;lag<=maxLag;lag++){
+    let d=0;
+    for(let i=0;i<W;i++){ const v=ds[i]-ds[i+lag]; d+=v*v; }
+    diff[lag]=d;
+  }
+  cm[0]=1; let running=0;
+  for(let lag=1;lag<=maxLag;lag++){
+    running+=diff[lag];
+    cm[lag]=running>1e-12?diff[lag]/(running/lag):1;
+  }
+  const cands=[], ceil=0.30;
+  let firstHz=0;
+  for(let lag=minLag;lag<maxLag;lag++){
+    if(cm[lag]>=ceil||cm[lag]>cm[lag-1]||cm[lag]>cm[lag+1]) continue;
+    const l=cm[lag-1],c=cm[lag],r=cm[lag+1];
+    const den=2*(2*c-l-r);
+    const refined=Math.abs(den)>1e-9?lag+(r-l)/den:lag;
+    const hz=sr2/Math.max(1,refined);
+    if(hz<PITCH_MIN||hz>PITCH_MAX) continue;
+    if(!firstHz&&c<0.16) firstHz=hz;
+    const clarity=Math.max(0,1-c);
+    let dup=false;
+    for(const q of cands) if(Math.abs(12*Math.log2(hz/q.hz))<0.6){
+      dup=true; if(clarity>q.clarity){q.hz=hz;q.clarity=clarity;} break;
+    }
+    if(!dup) cands.push({hz,clarity});
+  }
+  if(!cands.length){
+    let m=1e9,bi=minLag;
+    for(let lag=minLag;lag<=maxLag;lag++) if(cm[lag]<m){ m=cm[lag]; bi=lag; }
+    const hz=sr2/bi;
+    if(m>0.38||hz<PITCH_MIN||hz>PITCH_MAX)
+      return {hz:0,clarity:Math.max(0,1-m),rms,cands:[],conflict:false};
+    cands.push({hz,clarity:Math.max(0,1-m)});
+  }
+  cands.sort((a,b)=>(b.clarity-a.clarity)>0.06?b.clarity-a.clarity:b.hz-a.hz);
+  if(cands.length>6) cands.length=6;
+  if(!firstHz) firstHz=cands.reduce((m,c)=>Math.max(m,c.hz),PITCH_MIN);
+  const prev=A.hz>0?A.hz:0;
+  let best=cands[0],bestScore=-1e9;
+  for(const c of cands){
+    let sc=c.clarity;
+    if(c.hz<firstHz) sc-=0.34*Math.log2(firstHz/c.hz);
+    if(prev>0){
+      const sem=12*Math.log2(c.hz/prev);
+      sc-=0.012*Math.min(24,Math.abs(sem));
+      if(sem<-7) sc-=0.20;
+      else if(Math.abs(Math.abs(sem)-12)<2) sc-=0.10;
+    }
+    if(c.hz<PITCH_MIN*1.3) sc-=0.08;
+    if(sc>bestScore){ bestScore=sc; best=c; }
+  }
+  let conflict=false;
+  for(const c of cands){
+    if(c===best||c.clarity<0.68) continue;
+    const ratio=Math.max(c.hz,best.hz)/Math.min(c.hz,best.hz);
+    if(Math.abs(ratio-Math.round(ratio))>0.06){ conflict=true; break; }
+  }
+  return {hz:best.hz,clarity:best.clarity,rms,cands,conflict};
+}
+/* reject single-frame octave jumps: accept only after 3 consistent frames */
+function smoothPitch(raw){
+  if(raw<=0){ A.hzBuf=[]; A.holdHz=0; A.holdCount=0; return 0; }
+  const prev=A.hz;
+  if(prev>0){
+    const ratio=raw/prev;
+    if(ratio>1.75||ratio<0.57){
+      if(A.holdHz>0&&Math.abs(12*Math.log2(raw/A.holdHz))<2) A.holdCount++;
+      else { A.holdHz=raw; A.holdCount=1; }
+      if(A.holdCount<3){ A.jumpsHeld++; return prev; }
+      A.holdHz=0; A.holdCount=0; A.hzBuf=[];
+    }else{ A.holdHz=0; A.holdCount=0; }
+  }
+  A.hzBuf.push(raw); if(A.hzBuf.length>5) A.hzBuf.shift();
+  const s=A.hzBuf.slice().sort((a,b)=>a-b);
+  return s[Math.floor(s.length/2)];
+}
+/* slide direction: current value minus a ~0.22 s lagged reference of the
+   SAME voice. Rise -> positive, fall -> negative, hold -> decays to 0. */
+function slideOf(val,dt){
+  if(val===null) return;
+  const prev=A.valS;
+  const sv=prev===null?val:prev+(val-prev)*Math.min(1,dt/0.05);
+  A.valS=sv;
+  if(A.ref===null) A.ref=sv;
+  else A.ref+=(sv-A.ref)*Math.min(1,dt/0.22);
+  let d=sv-A.ref;
+  const dead=0.12;
+  if(Math.abs(d)<dead) d=0;
+  A.slide=d;
+}
+/* first-sound baseline (volume mode): median of the first 8 voiced frames */
+function captureBase(val){
+  if(S.play!=='calib') return;
+  if(A.base!==null) return;
+  A.baseBuf.push(val);
+  if(A.baseBuf.length>=8){
+    const s=A.baseBuf.slice().sort((a,b)=>a-b);
+    A.base=s[Math.floor(s.length/2)];
+  }
+}
+function resetBaseline(){
+  A.base=null;A.baseBuf=[];A.dev=0;A.ref=null;A.valS=null;A.slide=0;
+  A.lastA=null;A.hzBuf=[];A.holdHz=0;A.holdCount=0;
+  A.jumpsHeld=0;A.silentTime=0;A.meterHist=[];A.cand=[];A.conflict=false;
+}
+
+/* ============================ sampling ============================ */
+function sampleAudio(dt){
+  A.voiceA=false;A.val=null;
+  const sem=S.input;
+  if(A.ready&&A.analyser){
+    A.analyser.getFloatTimeDomainData(A.buf);
+    const p=detectPitch(A.buf,A.ctx.sampleRate);
+    A.hzRaw=p.hz;A.clarity=p.clarity;A.rms=p.rms;
+    A.cand=p.cands||[];A.conflict=!!p.conflict;
+    if(A.rms<A.gate*0.7) A.noiseFloor=A.noiseFloor*0.98+A.rms*0.02;
+    A.gate=Math.max(0.009,A.noiseFloor*2.3);
+    A.hz=sem==='pitch'?smoothPitch(p.hz):0;
+    const usable=p.clarity>=0.55||(p.clarity>=0.45&&A.hz>0);
+    A.pitchState=sem==='volume'
+      ? (p.rms>=A.gate?'live':'silent')
+      : (A.hz>0?(usable?'live':'weak'):(p.rms>=A.gate?'weak':'silent'));
+    if(sem==='pitch'){
+      if(A.hz>0&&usable&&p.rms>=A.gate){ A.val=12*Math.log2(A.hz); A.voiceA=true; }
+    }else if(p.rms>=A.gate){
+      A.val=20*Math.log10(Math.max(1e-6,p.rms)); A.voiceA=true;
+    }
+  }else{
+    A.hzRaw=0;A.cand=[];A.conflict=false;A.hz=0;A.clarity=0;A.rms=0;
+    A.pitchState='silent';
+  }
+  if(A.val!==null){
+    A.silentTime=0;
+    A.lastA=A.val;
+    captureBase(A.val);
+    slideOf(A.val,dt);
+  }else{
+    A.silentTime+=dt;
+    A.slide=0;
+    if(A.silentTime>0.5){ A.lastA=null;A.ref=null;A.valS=null; }
+  }
+  if(A.val!==null) A.dev = A.base!==null ? A.val-A.base : 0;
+  A.meterVal = A.val===null ? null : (sem==='volume'?A.val:A.hz);
+  A.meterHist.push(A.meterVal);
+  if(A.meterHist.length>90) A.meterHist.shift();
+}
+
+/* ============================ level ============================ */
+function makeRng(seed){
+  let s=(seed>>>0)||1;
+  return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+}
+function smoothLine(src,n,width){
+  if(!src||src.length<2) return null;
+  const W=width||CFG.W;
+  const pts=src.slice().sort((a,b)=>a.x-b.x);
+  const out=[]; let j=0;
+  for(let i=0;i<n;i++){
+    const x=(i/(n-1))*W;
+    while(j<pts.length-2&&pts[j+1].x<x) j++;
+    const a=pts[j],b=pts[Math.min(j+1,pts.length-1)];
+    const t=b.x>a.x?Math.max(0,Math.min(1,(x-a.x)/(b.x-a.x))):0;
+    out.push(a.y+(b.y-a.y)*t);
+  }
+  for(let pass=0;pass<3;pass++)
+    for(let i=1;i<out.length-1;i++) out[i]=(out[i-1]+out[i]*2+out[i+1])/4;
+  return out;
+}
+function makePeriodic(base){
+  if(!base||base.length<4) return base;
+  const a=base.slice(),n=a.length,tail=Math.max(4,Math.floor(n*0.14));
+  const end=a[n-1],start=a[0];
+  for(let i=0;i<tail;i++){ const k=i/(tail-1); a[n-tail+i]=end*(1-k)+start*k; }
+  return a;
+}
+function tile(base,times){
+  if(!base||base.length<2) return null;
+  const out=[];
+  for(let t=0;t<times;t++) for(let i=0;i<base.length;i++) out.push(base[i]);
+  return out;
+}
+/* ============================ gate geometry ============================
+   Two neighbouring gates sit `gapX` apart and each one is a horizontal band
+   of height 2*hw around the centreline. Their openings OVERLAP by
+   2*hw-|dc|, and the drop |dc| between two neighbours is bounded from BOTH
+   sides:
+     - |dc| <= 2*hw-gateMinOverlap, so the two openings still overlap and a
+       route always exists (the old -130px gap is gone);
+     - |dc| >  2*hw-24, so the overlap is smaller than the 24px bird and NO
+       horizontal line can thread two gates: every gate costs a real climb
+       or dive, and the longest straight run is one gate.
+   The discrete ladder of randomKeys() enforces both bounds on the built-in
+   track. A hand-drawn pipe strip follows the stroke faithfully instead and
+   has NO inter-gate constraint at all - customKeys only clamps it to the
+   band - so neighbouring custom openings may go level or even stop
+   overlapping: the shape the player drew is the law there. */
+/* The vertical band a gate centre may live in. It spans the visible window
+   (minus a small lip) instead of hugging the world edge: the gate opening is
+   drawn as an off-screen pipe, so the corridor can use the whole height and
+   hand-drawn climbs are no longer squeezed into a narrow middle strip. */
+function gateSafeBand(){
+  return [VIEWY0+16,VIEWY0+VIEWH-16];
+}
+/* The canyon has no gates, but its walls are twice as deep, so the corridor
+   has to stay further away from the edge of the window - otherwise one wall
+   is squeezed flat against the border and the player cannot see it. */
+function canyonSafeBand(){
+  const hw=CFG.spikeHalfW[S.diff]||CFG.spikeHalfW.normal;
+  /* 14 keeps both walls on screen while giving the corridor noticeably more
+     room to swing than the old 18px inset. */
+  return [VIEWY0+hw+14,VIEWY0+VIEWH-hw-14];
+}
+/* The band the CURRENT course uses. */
+function currentSafeBand(){
+  return isSpikeTrack()?canyonSafeBand():gateSafeBand();
+}
+/* Half-height of one gate opening on the track being built or flown.
+   `style` is 'spikes' for the canyon, 'custom' for a hand-drawn strip and
+   omitted for the built-in random track. */
+function gateHalfW(style){
+  const canyon=style?style==='spikes':isSpikeTrack();
+  if(canyon) return CFG.spikeHalfW[S.diff]||CFG.spikeHalfW.normal;
+  /* Custom pipes share the built-in per-difficulty widths (240/164/132);
+     `style` 'custom' and the built-in random track resolve to the same gate. */
+  return CFG.halfW[S.diff]||CFG.halfW.normal;
+}
+/* The largest legal drop between two neighbouring gate centres: any more and
+   the two openings stop overlapping. The canyon follows the same rule with
+   its own, deeper corridor. */
+function maxGateDrop(style){
+  return Math.max(40,2*gateHalfW(style)-CFG.gateMinOverlap);
+}
+/* The worst vertical change over any window of k samples. A gate is a band
+   and two NEIGHBOURING gates are gapX apart, so the only thing that has to
+   stay bounded is the change over one gate spacing - never the change from
+   one 14px sample to the next. Measuring per sample forbade short steep
+   moments that are perfectly flyable. */
+function windowDrop(line,k){
+  let v=0;
+  for(let i=0;i+k<line.length;i++){
+    const d=Math.abs(line[i+k]-line[i]);
+    if(d>v) v=d;
+  }
+  return v;
+}
+/* Squash the whole line towards its own mean until every gate spacing fits.
+   Scaling is linear, so the stroke keeps EXACTLY its shape - curvature,
+   rhythm, every wiggle - and only loses amplitude. Clamping each sample
+   instead turned any steep stroke into a chain of identical straight ramps,
+   which is why the studio felt like it could only draw straight lines. */
+function fitAmplitude(line,drop,k){
+  if(!line||line.length<2||!(drop>0)||!(k>0)) return line;
+  const out=line.slice();
+  let mean=0;
+  for(let i=0;i<out.length;i++) mean+=out[i];
+  mean/=out.length;
+  for(let pass=0;pass<8;pass++){
+    const v=windowDrop(out,k);
+    if(!(v>drop)) break;
+    const s=drop/v;
+    for(let i=0;i<out.length;i++) out[i]=mean+(out[i]-mean)*s;
+  }
+  return out;
+}
+/* Flatten a sampled line so that no step is steeper than the gates allow,
+   and close the loop at the same time. Both constraints are convex, so the
+   two projections can be alternated until they agree: the slope pass pulls
+   the line flat, the seam pass pulls the two ends together. The loop only
+   has to close within one step - the seam stays invisible.
+   Only the RANDOM track still uses this; a hand-drawn strip is mirrored
+   instead (see customCenterline), because tilting a drawing flat destroys
+   the very shape the player drew. */
+function makeRideable(line,dx,maxStep){
+  if(!line||line.length<2||!(maxStep>0)) return line;
+  const out=line.slice(), n=out.length;
+  for(let pass=0;pass<40;pass++){
+    for(let i=1;i<n;i++){
+      const d=out[i]-out[i-1];
+      if(d>maxStep) out[i]=out[i-1]+maxStep;
+      else if(d<-maxStep) out[i]=out[i-1]-maxStep;
+    }
+    const seam=out[n-1]-out[0];
+    if(Math.abs(seam)<=maxStep) break;
+    const k=seam/(n-1);
+    for(let i=0;i<n;i++) out[i]-=k*i;
+  }
+  return out;
+}
+/* The biggest vertical step allowed between two neighbouring samples. */
+function slopeStep(dx,gap,style){
+  /* A little head-room for the seam projection, which trades a little slope
+     for a loop that closes. */
+  return 0.95*maxGateDrop(style)*dx/(gap||CFG.gapX[S.diff]||CFG.gapX.normal);
+}
+function randomKeys(seed){
+  const rnd=makeRng(seed);
+  const gap=CFG.gapX[S.diff]||CFG.gapX.normal;
+  const m=Math.max(8,Math.round(CFG.loopLen/gap));
+  /* Use the full legal drop: the discrete ladder below guarantees no step
+     exceeds it, so no continuous-walk margin is needed. */
+  const d=Math.max(40,maxGateDrop());
+  const band=currentSafeBand();
+  /* Exact ladder of legal levels: every step moves exactly one rung. The rung
+     is (band span)/n, chosen so it is at most d but still ABOVE 2*hw-24
+     (easy 224>216, normal 149.3>140, hard 112>108): reaching the next gate is
+     easy, while a level flight cannot thread two of them. A discrete ladder
+     matters - a clamped continuous walk kept producing near-duplicate gates
+     at the band edges, and those flats let a level flight slip through. */
+  const span=band[1]-band[0];
+  const n=Math.max(2,Math.ceil(span/d));
+  const levels=[];
+  for(let i=0;i<=n;i++) levels.push(band[0]+span*i/n);
+  /* Ladder index of the gate within the band, plus a target rung. The walk is
+     monotone toward each target and every target is at least two rungs away,
+     so the corridor sweeps the full band instead of hovering on one height. */
+  const pick=from=>{
+    const opts=[];
+    for(let i=0;i<=n;i++) if(Math.abs(i-from)>=Math.min(2,n)) opts.push(i);
+    return opts.length?opts[Math.floor(rnd()*opts.length)]:(from===0?n:0);
+  };
+  const ring=[];
+  let idx=1+Math.floor(rnd()*(n-1));
+  let target=pick(idx);
+  for(let i=0;i<m;i++){
+    ring.push(idx);
+    if(idx===target) target=pick(idx);
+    idx+=Math.sign(target-idx);
+  }
+  /* Close the ring on a legal step and on the far side of the first gate from
+     the second, so the seam reads as one more monotone step. A ramp or a
+     clamped tail would park several gates on one height and hand out a long
+     free level flight. */
+  const home=ring[0];
+  const leave=ring.length>1?(Math.sign(ring[1]-ring[0])||1):1;
+  let stopR=home-leave;
+  if(stopR<0||stopR>n) stopR=home+leave;
+  stopR=mclamp(stopR,0,n);
+  let last=ring[ring.length-1], guard=0;
+  while(last!==stopR&&guard++<n+4){
+    ring.push(last+Math.sign(stopR-last));
+    last=ring[ring.length-1];
+  }
+  return ring.map(i=>levels[i]);
+}
+/* Everything below builds a gate key list out of a hand-drawn stroke. */
+/* ======================= gate keys =======================
+   The GATES are the course. Storing one height per gate, instead of one per
+   14px sample, changes three things at once:
+     - the drop budget is enforced exactly where it matters, between two
+       neighbouring gates, so the corridor can plunge freely elsewhere;
+     - a correction near the finger can never rescale the track behind it
+       (that global rescale is what made the studio feel like it could only
+       draw straight ramps);
+     - a redraw costs O(gates), not O(samples), so the preview stays live.
+   The spline between two keys is free to overshoot: nothing can be hit
+   between gates. */
+function keyAt(keys,g,worldX){
+  const m=keys.length;
+  if(m<2) return LOG.H/2;
+  let u=(g>0?worldX/g:0);
+  u=((u%m)+m)%m;
+  const i=Math.floor(u), t=u-i;
+  const p0=keys[(i-1+m)%m],p1=keys[i%m],p2=keys[(i+1)%m],p3=keys[(i+2)%m];
+  const t2=t*t,t3=t2*t;
+  return 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3);
+}
+function lineAt(worldX){
+  const K=G.keys;
+  if(!K||K.length<2) return LOG.H/2;
+  return keyAt(K,G.keyGap||CFG.gapX[S.diff],worldX-CFG.gateStart);
+}
+/* The magnetic snap a hand-drawn CANYON needs: every wall sample keeps the
+   height the stroke asked for, and only the pairs that sit further apart than
+   the drop budget are nudged - each one by HALF the excess, so the track bends
+   as little as possible. The pass is strictly local and runs over the keys as
+   a RING, so the seam pair (last gate back to gate 0) obeys the same budget.
+   Pipes don't need this either: customKeys maps the stroke faithfully with
+   NO inter-gate constraint at all - the band clamp is its only limit. */
+function relaxKeys(keys,d,band){
+  const m=keys.length;
+  if(m<2||!(d>0)) return keys;
+  const lo=band?band[0]:-1e9, hi=band?band[1]:1e9;
+  for(let i=0;i<m;i++) keys[i]=mclamp(keys[i],lo,hi);
+  for(let pass=0;pass<40;pass++){
+    let worst=0;
+    for(let j=0;j<m;j++){
+      const k=(j+1)%m;
+      const diff=keys[k]-keys[j];
+      const over=Math.abs(diff)-d;
+      if(over<=0) continue;
+      const s=(diff>0?1:-1)*over*0.5;
+      keys[j]=mclamp(keys[j]+s,lo,hi);
+      keys[k]=mclamp(keys[k]-s,lo,hi);
+      if(over>worst) worst=over;
+    }
+    if(worst<0.08) break;
+  }
+  return keys;
+}
+/* A custom drawing can be played either as green pipe gates or as the orange
+   spike canyon; the built-in canyon track is always a canyon. */
+function isSpikeTrack(){
+  return S.track==='spikes'||(S.track==='custom'&&UI.customStyle==='spikes');
+}
+/* Gates are ADDRESSED BY INDEX, never stored in a list. Gate i is a pure
+   function of (seed, difficulty, i), so an endless track still yields
+   byte-identical geometry on every device with zero sync traffic, and the
+   game never has to build an array it would eventually run out of. */
+function gateAt(i){
+  const gap=G.keyGap||CFG.gapX[S.diff], hw=gateHalfW();
+  const x=CFG.gateStart+i*gap;
+  /* The gate rides exactly on its own key. Any extra jitter would eat into
+     the overlap between two neighbouring gates, which is the very opening
+     the player has to thread. */
+  const cy=G.keys&&G.keys.length?keyAt(G.keys,gap,i*gap):LOG.H/2;
+  const band=gateSafeBand();
+  const c=mclamp(cy,band[0],band[1]);
+  return {i,x,w:CFG.gateW,c,hw};
+}
+/* Difficulty changes three knobs at once (width, density, speed) so the three
+   modes feel clearly different instead of only re-labelling the same track. */
+function speedForDiff(d){ return CFG.speed[d||S.diff]||CFG.vx; }
+/* The spike canyon has NO gates: its whole boundary is a continuous toothed
+   ridge following the centerline. spikeBoundsAt() is the single collision
+   source of truth for that track — teeth point inward from each edge and the
+   smoothstepped triangle makes drawing and physics agree exactly.
+   The run now STARTS with a wide flat mouth and a green gate; the walls only
+   begin to narrow and grow teeth AFTER the gate, over spikeEntryEnd. */
+function spikeCanyonHalfW(worldX){
+  const base=CFG.spikeHalfW[S.diff]||CFG.halfW[S.diff];
+  const a=CFG.spikeEntryDoorX+CFG.spikeEntryDoorW, b=CFG.spikeEntryEnd;
+  if(worldX<=a) return CFG.spikeEntryHW;
+  if(worldX>=b) return base;
+  const t=mclamp((worldX-a)/(b-a),0,1);
+  const s=t*t*(3-2*t);                 /* smoothstep, no abrupt wall jump */
+  return CFG.spikeEntryHW+(base-CFG.spikeEntryHW)*s;
+}
+function spikeTeeth(worldX){
+  const a=CFG.spikeEntryDoorX+CFG.spikeEntryDoorW, b=CFG.spikeEntryEnd;
+  if(worldX<=a) return 0;
+  if(worldX>=b) return 1;
+  const t=mclamp((worldX-a)/(b-a),0,1);
+  return t*t*(3-2*t);
+}
+/* The entrance is centred on the screen instead of following the wavy
+   centerline, so the big mouth always shows BOTH walls. The funnel then
+   blends into the real centerline before the full canyon begins. centerY is a
+   parameter (not a call to lineAt) so the studio can feed its own track into
+   the very same blend. */
+function canyonCenterAt(worldX,centerY){
+  const a=CFG.spikeEntryDoorX+CFG.spikeEntryDoorW, b=CFG.spikeEntryEnd;
+  if(worldX<=a) return LOG.H/2;
+  if(worldX>=b) return centerY;
+  const t=mclamp((worldX-a)/(b-a),0,1);
+  const s=t*t*(3-2*t);
+  return LOG.H/2+(centerY-LOG.H/2)*s;
+}
+/* Shared canyon geometry. The studio preview and the running game both use
+   this, so what the player sees while drawing is exactly what they fly.
+   The passage between the walls is widened until it can always hold the
+   bird, and both walls are kept on screen. */
+function canyonBounds(c,hw,inset){
+  let top=c-hw+inset, bot=c+hw-inset;
+  const minPass=Math.min(CFG.spikeMinPass,LOG.H-20);
+  if(bot-top<minPass){
+    const mid=(top+bot)/2;
+    top=mid-minPass/2; bot=mid+minPass/2;
+  }
+  const lo=VIEWY0+10, hi=VIEWY0+VIEWH-10;
+  if(top<lo){ const d=lo-top; top+=d; bot+=d; }
+  if(bot>hi){ const d=bot-hi; top-=d; bot-=d; }
+  /* If the whole channel was pushed off screen, re-centre it so the bird
+     still has a way through instead of hitting an invisible wall. */
+  if(bot-top<minPass){
+    const mid=mclamp((top+bot)/2,lo+minPass/2,hi-minPass/2);
+    top=mid-minPass/2; bot=mid+minPass/2;
+  }
+  return {top,bot};
+}
+/* One sampling of the canyon boundary for ANY centreline. The game passes the
+   live track, the studio passes the drawn one, so the two cannot disagree. */
+function canyonAt(worldX,centerY){
+  const hw=spikeCanyonHalfW(worldX);
+  const per=CFG.spikePeriod, half=per/2;
+  const px=((worldX%per)+per)%per;
+  /* Triangle -> smoothstep: the raw triangle swung each wall edge +/-22px
+     every 13px of world, which read as the canyon shaking. The rounded wave
+     hits the SAME extremes (0 and spikeAmp), so the minimum passage, the
+     drawing vertices and the physics all still agree - the edge just glides
+     between them instead of sawing. */
+  const u=px<=half?px/half:2-px/half;
+  const tri=u*u*(3-2*u);
+  const inset=tri*CFG.spikeAmp*spikeTeeth(worldX);
+  const b=canyonBounds(canyonCenterAt(worldX,centerY),hw,inset);
+  return {top:b.top,bot:b.bot,hw};
+}
+function spikeBoundsAt(worldX){ return canyonAt(worldX,lineAt(worldX)); }
+/* Compatibility alias: the entrance blend now takes the centreline as an
+   argument, and this is the running-game binding of it. */
+function spikeCenterAt(worldX){ return canyonCenterAt(worldX,lineAt(worldX)); }
+/* Entrance marker for the canyon mouth, shared by the running game and the
+   studio. Deliberately NOT styled like a pipe gate any more: the old
+   solid-green walls + rounded cap boxes were the exact pipe-mouth recipe,
+   and painted over the orange ridge they read as pipes stacked inside the
+   canyon. Now it is a translucent green tint (the ridge stays visible
+   underneath) plus a checker strip that floats a few pixels OFF each wall
+   edge like a start-line tape. The edges still come from the same geometry
+   the physics uses, so the decorated opening is the safe one. */
+function paintSpikeEntry(d0,d1,edgeAt,toScr){
+  const t0=edgeAt(d0).top, b0=edgeAt(d0).bot;
+  gx.fillStyle='rgba(130,217,107,.42)';
+  gx.fillRect(toScr(d0),VIEWY0-14,d1-d0,t0-(VIEWY0-14));
+  gx.fillRect(toScr(d0),b0,d1-d0,(VIEWY0+VIEWH+14)-b0);
+  const sq=12, off=6;
+  for(let x=d0;x<d1;x+=sq){
+    const w=Math.min(sq,d1-x), k=Math.round((x-d0)/sq);
+    const e=edgeAt(Math.min(x+sq/2,d1-0.5));
+    gx.fillStyle=(k%2===0)?'#82d96b':'#40362e';
+    gx.fillRect(toScr(x),e.top+off,w,sq);
+    gx.fillStyle=(k%2===0)?'#40362e':'#82d96b';
+    gx.fillRect(toScr(x),e.bot-off-sq,w,sq);
+  }
+}
+function drawSpikeDoor(){
+  const d0=CFG.spikeEntryDoorX, d1=d0+CFG.spikeEntryDoorW;
+  const sx0=d0-G.camX, sx1=d1-G.camX;
+  if(sx1<-30||sx0>LOG.W+30) return;
+  paintSpikeEntry(d0,d1,spikeBoundsAt,x=>x-G.camX);
+}
+/* The gate counter only makes sense on gate tracks; the canyon is scored by
+   distance alone, so its chip is hidden instead of showing a fake number. */
+function showsGateCount(){ return !isSpikeTrack(); }
+/* How many gates are already behind the bird. Because gates are indexed this
+   is arithmetic instead of a counter that has to survive window rebuilds. */
+function gatesPassed(){
+  const gap=G.keyGap||CFG.gapX[S.diff];
+  const n=Math.ceil((G.x-CFG.gateStart-CFG.gateW)/gap);
+  return n>0?n:0;
+}
+function customKeys(points,width,style){
+  const W=mclamp(width||CFG.W,CFG.W,CFG.drawMaxLen);
+  const gap=CFG.gapX[S.diff]||CFG.gapX.normal;
+  /* An EVEN number of gates per loop keeps the mirror exact: the second half
+     is the first half played backwards, so the strip's two edges land on the
+     same gate and the loop closes without a seam. */
+  const half=Math.max(2,Math.round(W/gap));
+  const m=half*2;
+  const band=style==='spikes'?canyonSafeBand():gateSafeBand();
+  /* Four samples per gate is enough for the smoother and cheap enough to run
+     on every pointer move - the old 14px grid meant 576 samples and an
+     eight-pass global fit on each finger move. */
+  const n=m*4+1;
+  const s=smoothLine(points,n,W);
+  if(!s) return null;
+  const gapEff=2*W/m;
+  const keys=[];
+  for(let i=0;i<m;i++){
+    const rx=i*gapEff;
+    /* Strip coordinate of this gate: the first half walks forward, the
+       mirrored half walks back, which is exactly how the play line is
+       built. */
+    const sx=rx<=W?rx:2*W-rx;
+    const p=sx/W*(n-1), a=Math.floor(p), t=p-a;
+    const y=s[a]*(1-t)+s[Math.min(a+1,n-1)]*t;
+    keys.push(mclamp(y,band[0],band[1]));
+  }
+  /* A canyon only has to stay passable, so its ceiling is enough. */
+  if(style==='spikes') return relaxKeys(keys,0.98*maxGateDrop('spikes'),band);
+  /* Pipes are WYSIWYG: every gate takes the height the stroke drew at its
+     position, sample for sample. There is NO inter-gate constraint at all -
+     no reach clamp, no ladder, no alternation, no folding, no dithering. The
+     drawer owns the shape: the band clamp in the sampling loop above, which
+     keeps every gate centre inside the visible corridor, is the ONLY limit
+     left. Adjacent gate heights therefore follow the drawn stroke exactly -
+     a steep zigzag is reproduced verbatim, a flat stroke produces a flat
+     track, and a level line may thread two custom gates: that is exactly
+     what the player drew. */
+  /* The mirrored half replays the forward half backwards; with no clamping
+     the seam pair (m-1,0) is simply the forward pair (0,1) reversed, so the
+     mirror alone keeps the loop consistent. */
+  for(let i=1;i<half;i++) keys[m-i]=keys[i];
+  return keys;
+}
+
+/* ============================ physics ============================ */
+function ctrlTarget(){
+  if(S.mode==='duo'){
+    /* A lifts, B pushes down. Each player has exactly ONE meaningful move.
+       The span follows the source the room was created with. The wire sign is
+       fixed at the send site (netTick): B posts -localCtrl(), so a higher or
+       louder guest voice arrives NEGATIVE and max(0,-v) below reads it as
+       downward push. */
+    const span=CFG.span[S.input]||CFG.span.pitch;
+    const upA   = Math.max(0,A.slide)/span;
+    const downB = Math.max(0,-(NET.remoteB||0));
+    return mclamp(upA-downB,-1,1);
+  }
+  if(S.input==='volume'){
+    if(A.base===null) return 0;
+    return mclamp(S.gain*A.dev/CFG.baseSpan,-1,1);
+  }
+  return mclamp(S.gain*A.slide/CFG.span.pitch,-1,1);
+}
+/* Per-side influence magnitudes for the duo HUD arrows, each in [0,1].
+   Both roles need BOTH numbers: a side's own contribution is computed
+   locally at 60 fps, the partner's arrives through the room sync
+   (NET.remoteA / NET.remoteB, normalized at the send site). */
+function duoMags(){
+  const span=CFG.span[S.input]||CFG.span.pitch;
+  const mine=mclamp(Math.max(0,S.gain*A.slide)/span,0,1);
+  if(NET.role==='B') return {up:mclamp(Math.max(0,NET.remoteA||0),0,1),down:mine};
+  return {up:mine,down:mclamp(Math.max(0,-(NET.remoteB||0)),0,1)};
+}
+function step(dt){
+  if(S.play!=='calib'&&S.play!=='playing') return;
+  if(S.play==='calib'){
+    G.calibT-=dt;
+    G.x+=speedForDiff()*0.6*dt; G.camX=G.x-CFG.birdX;
+    G.theta+=(ctrlTarget()-G.theta)*Math.min(1,dt*7);
+    G.vy=-CFG.baseLift*G.theta;
+    G.y+=G.vy*dt;
+    G.y=mclamp(G.y,VIEWY0+CFG.birdR+2,VIEWY0+VIEWH-CFG.birdR-2);
+    G.dist=Math.max(G.dist,G.x/10);
+    const anchored=S.input==='volume'?(A.base!==null):(A.ref!==null);
+    if(anchored||G.calibT<=0){
+      if(S.input==='volume'&&A.base===null) A.base=-38;
+      S.play='playing';
+    }
+    return;
+  }
+  const target=ctrlTarget();
+  G.theta+=(target-G.theta)*Math.min(1,dt*7);
+  if(S.mode==='duo'||S.input==='pitch'){
+    /* no gravity in duo; pitch mode is weightless */
+    G.vFall=0;
+    G.vy=-CFG.baseLift*G.theta;
+  }else{
+    /* solo + volume: gravity builds while you are level or diving, and is
+       shaken off while you climb */
+    if(G.theta>0.06) G.vFall=Math.max(0,G.vFall-CFG.vFallMax*1.3*dt);
+    else G.vFall=Math.min(CFG.vFallMax,G.vFall+CFG.gravity*dt);
+    G.vy=-CFG.baseLift*G.theta+G.vFall;
+  }
+  G.x+=speedForDiff()*dt;
+  G.camX=G.x-CFG.birdX;
+  G.dist=Math.max(G.dist,G.x/10);
+  G.y+=G.vy*dt;
+  if(G.y<VIEWY0+CFG.birdR||G.y>VIEWY0+VIEWH-CFG.birdR){ setOver(); return; }
+  if(isSpikeTrack()){
+    /* Continuous ridge: sample exactly where the bird IS, so the drawn teeth
+       and the collision agree with no gate needed. */
+    const b=spikeBoundsAt(G.x), r=CFG.birdR;
+    if(G.y-r<b.top||G.y+r>b.bot){ setOver(); return; }
+  }else{
+    /* Only the two or three gates that can touch the bird are materialised;
+       the rest of the endless track is implied by their index. */
+    const bx=G.x,r=CFG.birdR,gap=G.keyGap||CFG.gapX[S.diff];
+    const i0=Math.max(0,Math.floor((bx-r-CFG.gateW-CFG.gateStart)/gap));
+    const i1=Math.floor((bx+r-CFG.gateStart)/gap);
+    for(let i=i0;i<=i1;i++){
+      const o=gateAt(i);
+      if(bx+r>o.x&&bx-r<o.x+o.w){
+        if(G.y-r<o.c-o.hw||G.y+r>o.c+o.hw){ setOver(); return; }
+      }
+    }
+  }
+  G.score=gatesPassed();
+}
+/* There is exactly ONE way to end a run: hitting a pillar. There is no
+   finish line and no victory state. The subtitle is rebuilt from the stored
+   numbers, so switching language while the overlay is up re-renders it. */
+function renderEndSub(){
+  if(!G.over) return '';
+  let s=tr('loseSub')
+    .replace('{s}',G.score).replace('{d}',Math.floor(G.dist));
+  /* The guest cannot end the run: its overlay says who drives the next
+     transition (the host's 回到房间 moves BOTH sides). */
+  if(S.mode==='duo'&&NET.role==='B') s+=' · '+tr('waitHost');
+  return s;
+}
+function updateEndArt(){
+  $('endArtUse').setAttribute('href','#i-crash');
+  $('endArt').setAttribute('class','art lose');
+}
+/* Over-overlay chrome depends on the role: the host gets the single
+   "回到房间" action, the guest gets none (it follows the host's phase). */
+function syncOverUI(){
+  const duo=S.mode==='duo';
+  const t=$('btnAgainTxt');
+  if(t) t.textContent=tr(duo?'toRoom':'again');
+  $('btnAgain').style.display=(duo&&NET.role==='B')?'none':'';
+}
+function setOver(){
+  S.play='over';
+  G.over=true;
+  G.overMsg=renderEndSub();
+  $('endTitle').textContent=tr('crashed');
+  $('endTitle').style.color='#e2574b';
+  $('endSub').textContent=G.overMsg;
+  updateEndArt();
+  syncOverUI();
+  $('ovEnd').classList.add('show');
+  syncPlayUI();
+}
+function resetGame(){
+  G.x=0;G.y=LOG.H/2;G.theta=0;G.vy=0;G.vFall=0;
+  G.score=0;G.dist=0;G.camX=0;G.stepCount=0;G.calibT=2.6;G.over=false;
+  resetBaseline();
+  if(S.track==='custom'&&UI.customLine&&UI.customLine.length>1){
+    /* The studio already snapped these keys to the current difficulty, and
+       the gate spacing is whatever the strip produced. */
+    G.keys=UI.customLine.slice();
+    G.keyGap=UI.customGap||CFG.gapX[S.diff];
+  }else{
+    G.keys=randomKeys(G.seed);
+    G.keyGap=CFG.gapX[S.diff]||CFG.gapX.normal;
+  }
+  G.loopLen=G.keys.length*G.keyGap;
+  G.centerline=null;
+  $('distVal').textContent='0';
+  $('ovEnd').classList.remove('show');
+}
+function buildAttract(){
+  /* The home screen shows a live preview of a random track instead of an
+     empty stage, so the player sees what the game looks like before
+     committing to a mode. */
+  G.seed=(Date.now()>>>0)||1;
+  G.keys=randomKeys(G.seed);
+  G.keyGap=CFG.gapX[S.diff]||CFG.gapX.normal;
+  G.loopLen=G.keys.length*G.keyGap;
+  G.x=0;G.camX=-CFG.birdX;G.y=LOG.H/2;G.theta=0;G.vy=0;G.dist=0;G.score=0;
+}
+function startGame(){
+  if(S.track==='custom'){
+    /* Re-fit the SAVED stroke for the difficulty that is about to be flown,
+       so the gates (and their spacing) are rebuilt from the current
+       selection instead of whatever was on screen last time. */
+    if(!UI.drawPts||UI.drawPts.length<4) loadStroke();
+    refreshBothLines();
+    if(!UI.customLine){
+      /* Nothing to fly: send the player to the canvas instead of a dead end. */
+      toast('needDraw','bad');
+      startDraw();
+      return;
+    }
+  }
+  G.seed=(Date.now()>>>0)||1;
+  resetGame();
+  S.play='calib';
+  UI.paused=false;
+  setScreen('solo');
+  syncPlayUI();
+}
+
+/* ============================ track editor ============================
+   The drawing is a WORLD-SPACE paper strip of arbitrary length; the canvas is
+   only a 400px viewport onto it and UI.drawScroll is its left edge. Because
+   the bird only ever flies right, the strip must be a function of x: auto
+   smooth enforces strictly increasing x and gently low-passes the y values. */
+const DRAW_STEP=3;
+/* The studio preview is rendered at 70% so one screen shows ~3 gate spacings
+   instead of 2. This is PREVIEW ONLY: the saved keys/gap and the in-game
+   geometry keep their real scale. */
+const EDITOR_SCALE=0.7;
+function drawViewportMax(){ return Math.max(0,UI.drawLen-LOG.W); }
+function clampScroll(){ UI.drawScroll=mclamp(UI.drawScroll,0,drawViewportMax()); }
+function extendDraw(target){
+  UI.drawLen=mclamp(Math.max(UI.drawLen,target),CFG.W,CFG.drawMaxLen);
+  refreshBothLines();
+  clampScroll();
+  updateDrawChrome();
+}
+function maybeExtend(x){
+  if(x>UI.drawLen-LOG.W*0.25) extendDraw(x+LOG.W*0.5);
+}
+function smoothStroke(pts){
+  if(!pts||pts.length<2) return pts?pts.slice():[];
+  const out=[];
+  for(const p of pts){
+    const last=out[out.length-1];
+    /* Drop a sample that doubles back - the bird has no reverse gear - but
+       NEVER push the forward samples apart. The old code forced one every
+       3px, so a slow finger (1px per event) stretched a third of the strip
+       across the whole paper and the drawing came out looking flattened. */
+    if(last&&p.x<=last.x) continue;
+    out.push({x:p.x,y:p.y});
+  }
+  /* Three passes is enough for a dense stroke; six visibly flattened it the
+     moment the finger lifted. */
+  for(let pass=0;pass<3;pass++)
+    for(let i=1;i<out.length-1;i++) out[i].y=(out[i-1].y+out[i].y*2+out[i+1].y)/4;
+  return out;
+}
+/* The studio style button is the SAME choice as the pen button on the setup
+   page - one state, two places to flip it. It used to be preview-only, which
+   meant the studio could show pipes while you actually flew a canyon; that is
+   exactly the "preview is not my track" complaint, so the split is gone. */
+function syncTrackStyleLabel(){
+  /* The pen button carries the style, so the setup sheet never asks for it a
+     second time: "draw · pipes" / "draw · canyon" is the whole choice. */
+  const t=$('trackCustomTxt');
+  if(t) t.textContent=tr(UI.customStyle==='spikes'?'customCanyon':'customPipes');
+  const b=$('btnDrawStyle');
+  if(b) b.dataset.style=UI.customStyle;
+}
+function updateDrawStyleBtn(){
+  const t=$('drawStyleTxt');
+  if(t) t.textContent=tr(UI.customStyle==='spikes'?'previewSpikes':'previewPipes');
+  const icon=$('drawStyleIcon');
+  if(icon) icon.setAttribute('href',UI.customStyle==='spikes'?'#i-flame':'#i-route');
+  syncTrackStyleLabel();
+}
+function setDrawPreviewStyle(v){ setDrawStyle(v); }
+/* The FINAL pipes/canyon choice. It only ever changes the style of a
+   hand-drawn course; built-in tracks already define their own geometry. */
+function setDrawStyle(v){
+  UI.customStyle=v==='spikes'?'spikes':'pipes';
+  /* Kept as an alias so nothing can read a stale "preview style". */
+  UI.drawPreviewStyle=UI.customStyle;
+  updateDrawStyleBtn();
+  /* The two styles need different corridors, so the course is rebuilt. */
+  refreshBothLines();
+  updateDrawChrome();
+  drawFrame();
+}
+function activeTrackStyle(){
+  return S.track==='spikes'?'spikes':(S.track==='custom'?UI.customStyle:'pipes');
+}
+function updateDrawChrome(){
+  const seek=$('drawSeek');
+  if(seek){
+    seek.max=String(Math.round(drawViewportMax()));
+    seek.value=String(Math.round(UI.drawScroll));
+  }
+  const txt=$('drawSeekTxt');
+  if(txt) txt.textContent=Math.round(UI.drawScroll/LOG.W+1)+' / '+Math.round(UI.drawLen/LOG.W);
+  /* The undo button is only alive while a snapshot exists to restore. */
+  const undoBtn=$('btnUndo');
+  if(undoBtn) undoBtn.disabled=!UI.drawUndo;
+  updateDrawStyleBtn();
+  /* The spec chip is the contract: difficulty + style + the gate spacing the
+     game will really use. If these numbers are on screen, the studio is
+     showing the flight, not an illustration of it. */
+  const spec=$('drawSpecTxt');
+  if(spec){
+    const n=UI.customLine?UI.customLine.length:0;
+    if(n){
+      spec.textContent=tr(S.diff)+' · '+tr(UI.customStyle==='spikes'?'styleSpikes':'stylePipes')
+        +' · '+Math.round(UI.customGap)+'px × '+n
+        +(UI.strokeSaved?' · '+tr('specSaved'):'');
+    }else{
+      spec.textContent=tr(S.diff)+' · '+tr(UI.customStyle==='spikes'?'styleSpikes':'stylePipes');
+    }
+  }
+}
+function scrollDraw(delta){
+  UI.drawScroll=mclamp(UI.drawScroll+delta,0,drawViewportMax());
+  updateDrawChrome();
+  drawFrame();
+}
+/* ---- saved track ----------------------------------------------------------
+   The studio used to wipe the stroke the moment it opened, so a track that had
+   already been saved vanished as soon as you went back to check it - and the
+   next "start" had nothing to fly. The stroke now lives in localStorage and is
+   only ever replaced by a new stroke or an explicit clear. */
+const STORE_KEY='vp.track.v1';
+function saveStroke(){
+  try{
+    if(!UI.drawPts||UI.drawPts.length<4) return;
+    const pts=UI.drawPts.map(p=>[Math.round(p.x*10)/10,Math.round(p.y*10)/10]);
+    localStorage.setItem(STORE_KEY,JSON.stringify({
+      pts:pts, len:Math.round(UI.drawLen), style:UI.customStyle, track:S.track
+    }));
+    UI.strokeSaved=true;
+    UI.savedTrack=S.track;
+  }catch(e){ UI.strokeSaved=false; }
+}
+function loadStroke(){
+  try{
+    const raw=localStorage.getItem(STORE_KEY);
+    if(!raw) return false;
+    const j=JSON.parse(raw);
+    if(!j||!Array.isArray(j.pts)||j.pts.length<4) return false;
+    /* Shape validation: every point must be an [x,y] pair of finite numbers.
+       A corrupt payload must fail cleanly here, never break boot. */
+    for(const a of j.pts){
+      if(!Array.isArray(a)||a.length<2||!Number.isFinite(a[0])||!Number.isFinite(a[1])) return false;
+    }
+    /* A live stroke in memory always wins over the stored copy. */
+    if(UI.drawPts&&UI.drawPts.length>=4) return true;
+    UI.drawPts=j.pts.map(a=>({x:a[0],y:a[1]}));
+    UI.smoothedUpTo=UI.drawPts.length;
+    UI.drawLen=mclamp(Number(j.len)||CFG.W*3,CFG.W,CFG.drawMaxLen);
+    UI.customStyle=j.style==='spikes'?'spikes':'pipes';
+    UI.drawPreviewStyle=UI.customStyle;
+    UI.savedTrack=j.track==='custom'?'custom':'';
+    UI.strokeSaved=true;
+    return true;
+  }catch(e){ return false; }
+}
+function clearStroke(){
+  UI.strokeSaved=false;
+  try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+}
+function startDraw(){
+  /* Entering the studio selects "my drawing" and RESTORES it. Nothing is
+     thrown away here; the 清空 button is the only way to start over. */
+  loadStroke();
+  UI.drawing=false;
+  UI.lastPointer=null;
+  UI.smoothWarned=false;
+  UI.drawUndo=null;
+  UI.drawPointerId=null;
+  /* Loaded points are already settled; only fresh pen input smooths. */
+  UI.smoothedUpTo=UI.drawPts.length;
+  UI.drawScroll=0;
+  S.track='custom';
+  syncSeg('segTrack','custom');
+  UI.drawPreviewStyle=UI.customStyle;
+  setScreen('draw');
+  /* Rebuild for the CURRENT difficulty: this is what makes the saved track
+     pick up the spacing of whatever difficulty is selected outside. */
+  refreshBothLines();
+  updateDrawChrome();
+  drawFrame();
+}
+function editorPoint(ev){
+  const r=game.getBoundingClientRect();
+  const lx=(ev.clientX-r.left)/r.width*LOG.W;
+  const ly=(ev.clientY-r.top)/r.height*VIEWH;
+  const cy=VIEWY0+VIEWH/2;
+  /* Invert drawEditor()'s preview transform and clamp to the real band the
+     gates/canyon may occupy, so a full-height drag uses the whole playable
+     range instead of a small strip in the middle. */
+  const band=UI.customStyle==='spikes'?canyonSafeBand():gateSafeBand();
+  return {
+    x:UI.drawScroll+lx/EDITOR_SCALE,
+    lx,
+    y:mclamp(cy+(ly-VIEWH/2)/EDITOR_SCALE,band[0],band[1])
+  };
+}
+function pushDrawPoint(p){
+  /* A finger that landed behind the saved stroke starts a NEW drawing: the
+     old one is replaced on the first real forward move (see onPointerDown),
+     so a stray tap can never erase a saved track. */
+  if(UI.freshFrom){
+    if(p.x<UI.freshFrom.x+DRAW_STEP){
+      UI.freshFrom.y=UI.freshFrom.y*0.45+p.y*0.55;
+      UI.dirty=true;
+      return;
+    }
+    UI.drawPts=[{x:UI.freshFrom.x,y:UI.freshFrom.y}];
+    UI.freshFrom=null;
+    UI.strokeSaved=false;
+    /* New stroke: reset the settle watermark (index 0 is the frozen anchor). */
+    UI.smoothedUpTo=1;
+  }
+  const pts=UI.drawPts, last=pts[pts.length-1];
+  if(last){
+    /* Only a real backwards move is refused. */
+    if(p.x<last.x-2){
+      if(!UI.smoothWarned){ toast('drawForward','bad'); UI.smoothWarned=true; }
+      return;
+    }
+    if(p.x<=last.x+DRAW_STEP){
+      /* A slow finger moves less than one sample per event. Instead of
+         dropping those events (which made the stroke freeze, then jump) the
+         last sample leans towards the finger, so the track follows it. */
+      last.y=last.y*0.45+p.y*0.55;
+      UI.dirty=true;
+      return;
+    }
+  }
+  pts.push({x:p.x,y:p.y});
+  /* Settle the tail incrementally instead of re-fitting the whole stroke on
+     lift: each point, once it has a right-hand neighbour, receives the same
+     mild 3-tap kernel the old global fit applied (a small window over the
+     last few points) - and is then FROZEN. Nothing before the watermark is
+     ever touched again, so lifting the finger cannot retroactively move
+     already-drawn geometry, and the gates preview is already smooth on
+     every frame while drawing. */
+  const settleTo=pts.length-2;
+  const from=Math.max(1,UI.smoothedUpTo,settleTo-4);
+  for(let pass=0;pass<3;pass++)
+    for(let i=from;i<=settleTo;i++)
+      pts[i].y=(pts[i-1].y+pts[i].y*2+pts[i+1].y)/4;
+  UI.smoothedUpTo=Math.max(UI.smoothedUpTo,settleTo+1);
+  UI.dirty=true;
+  maybeExtend(p.x);
+}
+function onPointerDown(ev){
+  if(S.screen!=='draw') return;
+  ev.preventDefault();
+  /* Multi-touch filter: the finger that OPENED the stroke owns it. A second
+     finger must not teleport the line (its move events) or end the stroke
+     mid-draw (its up event). */
+  if(UI.drawing&&UI.drawPointerId!==null) return;
+  /* One-level undo: remember the stroke exactly as it was before this
+     gesture began (deep-copied - pushDrawPoint mutates points in place). */
+  UI.drawUndo=UI.drawPts.map(p=>({x:p.x,y:p.y}));
+  UI.drawPointerId=ev.pointerId;
+  UI.drawing=true;
+  const p=editorPoint(ev);
+  UI.lastPointer=p;
+  const last=UI.drawPts[UI.drawPts.length-1];
+  if(last&&p.x<last.x-8){
+    /* Drawing over the start of the saved track = start over. */
+    UI.freshFrom={x:p.x,y:p.y};
+  }else{
+    UI.freshFrom=null;
+    UI.drawPts.push({x:p.x,y:p.y});
+    UI.smoothedUpTo=UI.drawPts.length-1;
+  }
+  UI.dirty=true;
+  updateDrawChrome();
+  try{ game.setPointerCapture(ev.pointerId); }catch(e){}
+}
+function onPointerMove(ev){
+  if(S.screen!=='draw'||!UI.drawing) return;
+  if(ev.pointerId!==UI.drawPointerId) return;
+  ev.preventDefault();
+  const p=editorPoint(ev);
+  UI.lastPointer=p;
+  pushDrawPoint(p);
+}
+function onPointerUp(ev){
+  /* Ignore releases from a finger that never opened this stroke. */
+  if(ev&&UI.drawPointerId!==null&&ev.pointerId!==UI.drawPointerId) return;
+  UI.drawing=false;
+  UI.drawPointerId=null;
+  UI.lastPointer=null;
+  UI.freshFrom=null;
+  /* NO global re-fit on lift: every point was already smoothed while it was
+     drawn, so the geometry on screen is final. Lifting the finger only
+     saves it. */
+  UI.dirty=false;
+  refreshBothLines();
+  /* Lifting the finger is the save point: the stroke survives leaving the
+     studio, switching difficulty and reloading the page. */
+  saveStroke();
+  updateDrawChrome();
+  drawFrame();
+}
+/* Holding a finger near the right edge keeps unrolling fresh canvas, so a
+   long track never needs a lift-and-scroll gesture mid-stroke. */
+function drawEdgeScroll(dt){
+  if(S.screen!=='draw'||!UI.drawing||!UI.lastPointer) return;
+  const edge=UI.lastPointer.lx;
+  if(edge<LOG.W-46) return;
+  extendDraw(UI.drawScroll+LOG.W+LOG.W*0.6);
+  UI.drawScroll=mclamp(UI.drawScroll+420*dt,0,drawViewportMax());
+  const p={x:UI.drawScroll+edge/EDITOR_SCALE,y:UI.lastPointer.y,lx:edge};
+  UI.lastPointer=p;
+  pushDrawPoint(p);
+  updateDrawChrome();
+}
+/* A random track can also be generated INSIDE the studio: it fills the whole
+   paper strip, stays editable, and never changes the chosen style or leaves
+   the editor. */
+function randomDrawLine(){
+  const rng=makeRng((Date.now()>>>0)||1);
+  /* Three sine layers with SCREEN-SCALE wavelengths: every 400px viewport
+     gets at least one full hill, on any strip length. A per-pixel random
+     walk either produced square-wave walls at the safety band or left the
+     first screen almost flat; this stays organic and always readable. */
+  const W=UI.drawLen;
+  const l1=260+rng()*160, l2=90+rng()*70, l3=38+rng()*30;
+  const p1=rng()*6.283, p2=rng()*6.283, p3=rng()*6.283;
+  const band=UI.customStyle==='spikes'?canyonSafeBand():gateSafeBand();
+  const mid=(band[0]+band[1])/2, amp=(band[1]-band[0])/2*0.92;
+  const n=Math.max(24,Math.round(W/DRAW_STEP));
+  const pts=[];
+  for(let i=0;i<=n;i++){
+    const x=i*(W/n);
+    const y=mid
+      +Math.sin(x/l1*6.283+p1)*amp*0.68
+      +Math.sin(x/l2*6.283+p2)*amp*0.26
+      +Math.sin(x/l3*6.283+p3)*amp*0.10;
+    pts.push({x,y:mclamp(y,band[0],band[1])});
+  }
+  UI.drawPts=smoothStroke(pts);
+  UI.drawScroll=0;
+  UI.smoothedUpTo=UI.drawPts.length;
+  UI.smoothWarned=false;
+  refreshBothLines();
+  saveStroke();
+  updateDrawChrome();
+  drawFrame();
+}
+function finishDraw(){
+  if(UI.drawPts.length<4){ toast('needDraw','bad'); return; }
+  /* No re-fit here either: the stroke on screen was smoothed while it was
+     drawn, so Done must not move it. */
+  /* The course is as long as the paper strip, so a short drawing still
+     gives a long ride instead of a stretched tail. */
+  const line=refreshBothLines();
+  if(!line){ toast('needDraw','bad'); return; }
+  UI.customLoopLen=drawStripWidth();
+  G.keys=line.slice();
+  G.keyGap=UI.customGap;
+  G.loopLen=line.length*UI.customGap;
+  S.track='custom';
+  syncSeg('segTrack','custom');
+  updateDrawStyleBtn();
+  saveStroke();
+  updateDrawChrome();
+  setScreen('solo');
+  toast('drawDone','good');
+}
+
+/* ============================ rendering ============================ */
+function rr(c,x,y,w,h,r){
+  c.beginPath();
+  c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
+}
+/* A corridor band around a polyline, built as a polygon (top edge forward,
+   bottom edge backward). Stroking a thick line instead would produce huge
+   round joints that read as blobs rather than a channel. */
+function ribbon(pts,hw,fill){
+  if(pts.length<2) return;
+  gx.beginPath();
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i];
+    if(i===0) gx.moveTo(p.x,p.y-hw); else gx.lineTo(p.x,p.y-hw);
+  }
+  for(let i=pts.length-1;i>=0;i--) gx.lineTo(pts[i].x,pts[i].y+hw);
+  gx.closePath();
+  gx.fillStyle=fill; gx.fill();
+}
+/* ============================ duo influence HUD ============================
+   Both players need to SEE each side pulling the shared bird. Two fixed
+   slots above the runway: A's lift (up arrow, green) and B's push (down
+   arrow, red). Length and opacity follow the live input; at zero the arrow
+   is hidden and only the label stays. Solo keeps its old UI - duo only. */
+function duoArrow(cx,mag,up){
+  const m=mclamp(mag,0,1);
+  gx.save();
+  gx.font='700 10px system-ui'; gx.textAlign='center';
+  gx.fillStyle='rgba(64,54,46,.55)';
+  gx.fillText(up?tr('duoHost'):tr('duoGuest'),cx,VIEWY0+80);
+  if(m>=0.02){
+    const dir=up?-1:1;
+    const y0=up?VIEWY0+64:VIEWY0+16;   /* arrows grow toward the mid line */
+    const h=10+30*m;
+    gx.globalAlpha=0.3+0.7*m;
+    gx.strokeStyle='#40362e'; gx.lineWidth=3;
+    gx.beginPath(); gx.moveTo(cx,y0); gx.lineTo(cx,y0+dir*h); gx.stroke();
+    gx.fillStyle=up?'#3e7d2c':'#e2574b';
+    gx.beginPath();
+    gx.moveTo(cx,y0+dir*(h+7));
+    gx.lineTo(cx-6,y0+dir*h);
+    gx.lineTo(cx+6,y0+dir*h);
+    gx.closePath(); gx.fill(); gx.stroke();
+  }
+  gx.restore();
+}
+/* Compact control briefing on the game HUD for the first seconds of a duo
+   run; the full version lives on the room screen (#roomBrief). */
+function drawDuoHint(){
+  const txt=tr(S.input==='volume'?'duoHintVolume':'duoHintPitch');
+  gx.save();
+  gx.font='700 12px system-ui'; gx.textAlign='center';
+  const w=gx.measureText(txt).width+22;
+  gx.fillStyle='rgba(255,252,242,.88)';
+  rr(gx,LOG.W/2-w/2,VIEWY0+88,w,24,11); gx.fill();
+  gx.strokeStyle='rgba(64,54,46,.65)'; gx.lineWidth=2; gx.stroke();
+  gx.fillStyle='#40362e';
+  gx.fillText(txt,LOG.W/2,VIEWY0+104);
+  gx.restore();
+}
+function drawFrame(){
+  const W=LOG.W,H=LOG.H;
+  if(S.screen==='draw'){ drawEditor(); return; }
+  /* Cream sky with a few parallax pixel clouds — decoration only, never a
+     collision object and never a "guide line". */
+  gx.fillStyle='#fff4d6'; gx.fillRect(0,VIEWY0,W,VIEWH);
+  for(let i=0;i<4;i++){
+    const r=makeRng(i*1013+7);
+    const bx0=r()*W, by=VIEWY0+26+r()*(VIEWH-80), s=0.8+r()*0.7;
+    let cx=(bx0-G.camX*0.25)%(W+180); if(cx<-90) cx+=W+180; cx-=90;
+    gx.fillStyle='#fffcf2';
+    gx.fillRect(cx,by,58*s,14*s); gx.fillRect(cx+14*s,by-9*s,30*s,9*s);
+  }
+  const ox=-G.camX;
+  if(isSpikeTrack()){
+    /* Full-width canyon: the same spikeBoundsAt() the physics uses, sampled
+       every quarter tooth so the smoothstepped wave renders as a glide
+       instead of a chord zigzag (the 0/amp extremes still land on samples). */
+    const stepX=CFG.spikePeriod/4;
+    gx.beginPath(); gx.moveTo(-10,VIEWY0-14);
+    for(let sx=0;sx<=W+stepX;sx+=stepX) gx.lineTo(sx,spikeBoundsAt(G.camX+sx).top);
+    gx.lineTo(W+10,VIEWY0-14); gx.closePath();
+    gx.fillStyle='#ff8b5e'; gx.fill();
+    gx.strokeStyle='#40362e'; gx.lineWidth=3; gx.lineJoin='miter'; gx.stroke();
+    gx.beginPath(); gx.moveTo(-10,VIEWY0+VIEWH+14);
+    for(let sx=0;sx<=W+stepX;sx+=stepX) gx.lineTo(sx,spikeBoundsAt(G.camX+sx).bot);
+    gx.lineTo(W+10,VIEWY0+VIEWH+14); gx.closePath();
+    gx.fillStyle='#ff8b5e'; gx.fill(); gx.stroke();
+    drawSpikeDoor();
+  }else{
+    /* Only the gates inside the viewport are materialised. The spacing comes
+       from G.keyGap (a hand-drawn strip sets its own), never from the
+       difficulty table - using the table here shifted the index window and
+       made the right edge of the screen show fewer gates than the game flies. */
+    const gap=G.keyGap||CFG.gapX[S.diff];
+    const d0=Math.max(0,Math.floor((G.camX-90-CFG.gateStart)/gap));
+    const d1=Math.ceil((G.camX+W+90-CFG.gateStart)/gap);
+    for(let i=d0;i<=d1;i++){
+      const o=gateAt(i);
+      const x=o.x+ox; if(x>W+80||x+o.w<-80) continue;
+      const top=o.c-o.hw, bot=o.c+o.hw;
+      gx.fillStyle='#82d96b';
+      rr(gx,x,-14,o.w,top+14,7); gx.fill();
+      gx.strokeStyle='#40362e'; gx.lineWidth=3; gx.stroke();
+      rr(gx,x,bot,o.w,H-bot+14,7); gx.fill(); gx.stroke();
+      /* chunky caps make the pipe mouth readable at a glance */
+      gx.fillStyle='#a5ea91';
+      rr(gx,x-5,top-16,o.w+10,22,6); gx.fill(); gx.stroke();
+      rr(gx,x-5,bot-6,o.w+10,22,6); gx.fill(); gx.stroke();
+    }
+  }
+  /* Pixel bird built from axis-aligned blocks so it matches the new logo. */
+  const by=G.y,bx=CFG.birdX;
+  gx.save(); gx.translate(bx,by);
+  gx.rotate(-G.theta*CFG.maxAngleDeg*Math.PI/180);
+  const flap=Math.sin(performance.now()/160)*0.5+0.5;
+  gx.strokeStyle='#40362e'; gx.lineWidth=3; gx.lineJoin='miter';
+  gx.fillStyle='#ffe185';
+  gx.fillRect(-21,-6,7,12); gx.strokeRect(-21,-6,7,12);
+  gx.fillRect(-15,-12,30,24); gx.strokeRect(-15,-12,30,24);
+  gx.fillStyle='#ff8b5e';
+  gx.fillRect(11,-3,10,6); gx.strokeRect(11,-3,10,6);
+  gx.fillRect(-13,1+flap*3,14,9); gx.strokeRect(-13,1+flap*3,14,9);
+  gx.fillStyle='#fff';
+  gx.fillRect(3,-9,7,7); gx.strokeRect(3,-9,7,7);
+  gx.fillStyle='#40362e';
+  gx.fillRect(6,-7,3,3);
+  gx.restore();
+  /* angle gauge: a horizontal pill at the bottom-left. A vertical bar on the
+     right edge was mistaken for a scrollbar on a phone. The gauge itself is
+     now an SVG element (see #hud), so only the numeric readout is left. */
+  if(S.mode==='duo'&&S.play==='playing'){
+    const mags=duoMags();
+    duoArrow(W/2-46,mags.up,true);
+    duoArrow(W/2+46,mags.down,false);
+    if(performance.now()<NET.hintUntil) drawDuoHint();
+  }
+  if(S.mode==='duo'&&NET.startAt){
+    const left=NET.startAt-serverNow();
+    if(left>0){
+      gx.fillStyle='rgba(255,244,214,.62)'; gx.fillRect(0,VIEWY0,W,VIEWH);
+      gx.textAlign='center'; gx.fillStyle='#ff8b5e';
+      gx.font='700 72px system-ui';
+      gx.fillText(left>900?tr('countGo'):String(Math.ceil(left/1000)),W/2,VIEWY0+VIEWH/2+26);
+      gx.textAlign='left';
+      return;
+    }
+  }
+}
+/* The studio paints the REAL track: the exact same gate keys the game will
+   fly, at the exact same spacing. There is only ONE list. */
+/* ONE track, no lookalike. The studio preview, the setup-page summary and the
+   game all read this very array, built from the saved stroke + the style + the
+   difficulty that is currently selected. `UI.previewLine` is kept as an alias
+   (older call sites and tests still read it) but it is never built separately:
+   a preview that can disagree with the flight is worse than no preview. */
+function drawStripWidth(){ return mclamp(UI.drawLen||CFG.W,CFG.W,CFG.drawMaxLen); }
+function refreshBothLines(){
+  const pts=UI.drawPts;
+  if(!pts||pts.length<4){
+    UI.customLine=null;UI.previewLine=null;
+    UI.customGap=0;UI.previewGap=0;UI.customPeriod=0;UI.previewPeriod=0;
+    return null;
+  }
+  const W=drawStripWidth();
+  /* customKeys() reads CFG.gapX[S.diff], so switching difficulty on the setup
+     page rebuilds the spacing automatically - that IS the "auto adjust". */
+  const keys=customKeys(pts,W,UI.customStyle);
+  UI.customLine=keys;
+  UI.customGap=keys?2*W/keys.length:0;
+  UI.customPeriod=keys?2*W:0;
+  UI.previewLine=keys;
+  UI.previewGap=UI.customGap;
+  UI.previewPeriod=UI.customPeriod;
+  return UI.customLine;
+}
+/* Strip coordinate -> gate height. Gate 0 sits at strip x=0 and the keys are
+   one `gap` apart, which is exactly how the game addresses them. */
+function editorCenterAt(wx){
+  const K=UI.previewLine,g=UI.previewGap;
+  if(!K||K.length<2||!(g>0)) return null;
+  const strip=UI.previewPeriod/2;
+  if(wx<0||wx>strip) return null;
+  return keyAt(K,g,wx);
+}
+/* Kept for callers/tests that used to clamp the preview separately: the keys
+   are already snapped into the band the gates live in. */
+function editorTrackCenterAt(wx){ return editorCenterAt(wx); }
+function editorPipes(off,W,H){
+  const K=UI.previewLine,g=UI.previewGap;
+  if(!K||K.length<2||!(g>0)) return;
+  const hw=gateHalfW('custom'),gw=CFG.gateW,band=gateSafeBand();
+  const strip=UI.previewPeriod/2;
+  const i0=Math.max(0,Math.floor((off-40)/g));
+  const i1=Math.min(K.length-1,Math.ceil((off+W+40)/g));
+  for(let i=i0;i<=i1;i++){
+    const sx=i*g;
+    /* The forward half is the drawn track; the mirrored half is the endless
+       loop replayed backwards, so it is rendered as a DIMMED GHOST: visible
+       so the flight past the seam can be read, clearly not hand-drawn. */
+    const ghost=sx>strip+0.5;
+    if(ghost) gx.globalAlpha=0.35;
+    const c=mclamp(K[i],band[0],band[1]),top=c-hw,bot=c+hw;
+    gx.fillStyle='#82d96b';
+    rr(gx,sx-off,-14,gw,top+14,7); gx.fill();
+    gx.strokeStyle='#40362e'; gx.lineWidth=3; gx.stroke();
+    rr(gx,sx-off,bot,gw,H-bot+14,7); gx.fill(); gx.stroke();
+    gx.fillStyle='#a5ea91';
+    rr(gx,sx-off-5,top-16,gw+10,22,6); gx.fill(); gx.stroke();
+    rr(gx,sx-off-5,bot-6,gw+10,22,6); gx.fill(); gx.stroke();
+    if(ghost) gx.globalAlpha=1;
+  }
+  /* Ghost centreline for the return half, plus its label at the seam. */
+  const lx0=Math.max(strip,off), lx1=Math.min(off+W,UI.previewPeriod-g);
+  if(lx1>lx0){
+    gx.save();
+    gx.globalAlpha=0.35;
+    gx.strokeStyle='rgba(45,115,35,.55)';
+    gx.lineWidth=2; gx.lineJoin='round'; gx.lineCap='round';
+    gx.beginPath();
+    for(let wx=lx0;wx<=lx1;wx+=6){
+      const c=keyAt(K,g,wx);
+      if(wx===lx0) gx.moveTo(wx-off,c); else gx.lineTo(wx-off,c);
+    }
+    gx.stroke();
+    gx.globalAlpha=0.55;
+    gx.fillStyle='#2d7323'; gx.font='700 13px system-ui';
+    gx.fillText(tr('drawReturn'),Math.max(strip-off,8)+8,band[0]+18);
+    gx.restore();
+  }
+}
+function editorCanyon(off,W,H){
+  /* H is the world height of the window. The studio strip starts where the
+     run's first gate sits, so strip x maps to world x by adding gateStart.
+     Every wall sample here goes through the SAME canyonAt() the collision
+     uses - the funnel, the teeth depth and the minimum passage included -
+     which is why the drawn canyon is the flown canyon. */
+  const K=UI.previewLine,g=UI.previewGap;
+  if(!K||K.length<2||!(g>0)) return;
+  const strip=UI.previewPeriod/2;
+  const x0=Math.max(0,off-2), x1=Math.min(strip,off+W+2);
+  if(x1-x0<2) return;
+  const stepX=4;
+  const top=[],bot=[];
+  for(let sx=x0;sx<=x1;sx+=stepX){
+    const wx=sx+CFG.gateStart;
+    const b=canyonAt(wx,editorCenterAt(sx));
+    top.push({x:sx-off,y:b.top});
+    bot.push({x:sx-off,y:b.bot});
+  }
+  if(top.length<2) return;
+  gx.beginPath(); gx.moveTo(top[0].x,VIEWY0-14);
+  for(const q of top) gx.lineTo(q.x,q.y);
+  gx.lineTo(top[top.length-1].x,-14); gx.closePath();
+  gx.fillStyle='#ff8b5e'; gx.fill();
+  gx.strokeStyle='#40362e'; gx.lineWidth=3; gx.lineJoin='miter'; gx.stroke();
+  gx.beginPath(); gx.moveTo(bot[0].x,VIEWY0+VIEWH+14);
+  for(const q of bot) gx.lineTo(q.x,q.y);
+  gx.lineTo(bot[bot.length-1].x,H+14); gx.closePath();
+  gx.fillStyle='#ff8b5e'; gx.fill(); gx.stroke();
+  /* The entrance marker the run always starts with - the SAME painter the
+     game uses, so the studio shows exactly what will be flown. */
+  const d0=CFG.spikeEntryDoorX, d1=d0+CFG.spikeEntryDoorW;
+  if(d1>off&&d0<off+W){
+    paintSpikeEntry(d0,d1,
+      wx=>canyonAt(wx,editorCenterAt(mclamp(wx-CFG.gateStart,0,strip))),
+      x=>x-off);
+  }
+}
+function drawEditor(){
+  /* The preview is drawn at EDITOR_SCALE around the window centre: more strip
+     fits on screen, while the saved keys and the flown geometry are untouched.
+     All coordinates below stay in world space; only this transform shrinks
+     them. */
+  const W=LOG.W,off=UI.drawScroll,k=EDITOR_SCALE;
+  const cyc=VIEWY0+VIEWH/2;
+  const viewW=W/k, viewTop=cyc-VIEWH/(2*k), viewBot=cyc+VIEWH/(2*k);
+  gx.fillStyle='#fff4d6'; gx.fillRect(0,VIEWY0,W,VIEWH);
+  gx.save();
+  gx.translate(0,cyc); gx.scale(k,k); gx.translate(0,-cyc);
+  /* The grid is anchored to WORLD coordinates, so panning is visible. */
+  gx.strokeStyle='rgba(64,54,46,.10)'; gx.lineWidth=1;
+  const g0=Math.floor(off/40)*40;
+  for(let wx=g0;wx<=off+viewW;wx+=40){
+    const sx=wx-off;
+    gx.beginPath(); gx.moveTo(sx,viewTop); gx.lineTo(sx,viewBot); gx.stroke();
+  }
+  for(let y=Math.floor(viewTop/40)*40;y<viewBot;y+=40){
+    gx.beginPath(); gx.moveTo(0,y); gx.lineTo(viewW,y); gx.stroke();
+  }
+  gx.strokeStyle='rgba(64,54,46,.3)'; gx.setLineDash([6,6]);
+  gx.beginPath(); gx.moveTo(0,cyc); gx.lineTo(viewW,cyc); gx.stroke(); gx.setLineDash([]);
+  /* The studio renders whichever style is going to be FLOWN - there is no
+     preview style any more, so the walls on screen are the walls in the game. */
+  const canyon=UI.customStyle==='spikes';
+  if(UI.drawPts.length>1){
+    if(canyon) editorCanyon(off,viewW,viewBot); else editorPipes(off,viewW,viewBot);
+    /* The guide line follows the SAME centreline the track is built from,
+       so the walls and the line can never disagree on screen. */
+    const line=[];
+    for(let wx=off;wx<=off+viewW;wx+=6){
+      const cy=editorCenterAt(wx);
+      if(cy!==null) line.push({x:wx-off,y:cy});
+    }
+    if(line.length>1){
+      gx.strokeStyle=canyon?'rgba(150,60,20,.55)':'rgba(45,115,35,.55)';
+      gx.lineWidth=2; gx.lineJoin='round'; gx.lineCap='round';
+      gx.beginPath(); gx.moveTo(line[0].x,line[0].y);
+      for(let i=1;i<line.length;i++) gx.lineTo(line[i].x,line[i].y);
+      gx.stroke();
+    }
+  }
+  /* Screen numbers let a long strip stay orientable while scrolling. */
+  gx.fillStyle='rgba(64,54,46,.5)'; gx.font='700 10px system-ui';
+  for(let wx=Math.ceil(off/LOG.W)*LOG.W;wx<=off+viewW;wx+=LOG.W)
+    gx.fillText(String(Math.round(wx/LOG.W)+1),wx-off+5,VIEWY0+14);
+  /* A right-edge arrow signals that more canvas unrolls while drawing. */
+  if(UI.drawLen-off>viewW+1){
+    gx.fillStyle='#40362e'; gx.font='700 20px system-ui'; gx.textAlign='right';
+    gx.fillText('▶',viewW-6,cyc+7); gx.textAlign='left';
+  }
+  gx.restore();
+}
+
+/* ============================ pitch meter ============================ */
+const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function noteName(hz){
+  if(!hz||hz<=0) return '--';
+  const n=Math.round(12*Math.log2(hz/440))+69;
+  return NOTE_NAMES[((n%12)+12)%12]+(Math.floor(n/12)-1);
+}
+/* ---------- SVG pitch meter ----------
+   Real SVG instead of a canvas bitmap: gradient track, sung-voice band,
+   220 Hz reference tick, the 90-frame history path and a glowing pointer.
+   Children are built once; each frame only updates attributes, so it stays
+   sharp on any DPI without re-allocating a bitmap. */
+const SVGNS='http://www.w3.org/2000/svg';
+const PB={};
+function pbEl(tag,attrs,parent){
+  const e=document.createElementNS(SVGNS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  (parent||pbar).appendChild(e);
+  return e;
+}
+function initPitchbar(){
+  if(PB.ready) return;
+  const defs=pbEl('defs',{});
+  const tg=pbEl('linearGradient',{id:'pbTrackG',x1:0,y1:0,x2:0,y2:1},defs);
+  pbEl('stop',{offset:'0','stop-color':'rgba(64,54,46,.16)'},tg);
+  pbEl('stop',{offset:'1','stop-color':'rgba(64,54,46,.06)'},tg);
+  const hg=pbEl('linearGradient',{id:'pbHistG',x1:0,y1:0,x2:1,y2:0},defs);
+  pbEl('stop',{offset:'0','stop-color':'rgba(74,134,201,.12)'},hg);
+  pbEl('stop',{offset:'.3','stop-color':'rgba(74,134,201,.7)'},hg);
+  pbEl('stop',{offset:'1','stop-color':'#4a86c9'},hg);
+  const rg=pbEl('radialGradient',{id:'pbPtrG'},defs);
+  pbEl('stop',{offset:'0','stop-color':'rgba(255,139,94,.95)'},rg);
+  pbEl('stop',{offset:'.45','stop-color':'rgba(255,139,94,.4)'},rg);
+  pbEl('stop',{offset:'1','stop-color':'rgba(255,139,94,0)'},rg);
+  PB.hist=pbEl('path',{fill:'none',stroke:'url(#pbHistG)','stroke-width':1.8,'stroke-linecap':'round','stroke-linejoin':'round'});
+  /* The meter is 44px tall and clips: none of these coordinates may reach
+     past it, otherwise SVG overflow paints on top of the game canvas. */
+  PB.track=pbEl('rect',{x:0,y:22,height:12,rx:6,fill:'url(#pbTrackG)',stroke:'rgba(64,54,46,.28)','stroke-width':1});
+  PB.band=pbEl('rect',{y:23,height:10,rx:5,fill:'rgba(130,217,107,.22)'});
+  PB.ref=pbEl('line',{stroke:'rgba(64,54,46,.3)','stroke-width':1,y1:21,y2:35});
+  PB.ptr=pbEl('g',{opacity:0});
+  pbEl('circle',{r:8,fill:'url(#pbPtrG)'},PB.ptr);
+  PB.knob=pbEl('circle',{r:4,fill:'#ff8b5e',stroke:'#40362e','stroke-width':1.4},PB.ptr);
+  const txt={'font-size':'9','font-family':'system-ui',fill:'rgba(64,54,46,.5)'};
+  PB.val=pbEl('text',{'font-size':'9.5','font-family':'system-ui',fill:'#40362e','text-anchor':'middle',y:20});
+  PB.t60=pbEl('text',txt); PB.t220=pbEl('text',Object.assign({'text-anchor':'middle'},txt));
+  PB.t1k=pbEl('text',Object.assign({'text-anchor':'end'},txt));
+  PB.t60.textContent='60'; PB.t220.textContent='220'; PB.t1k.textContent='1k';
+  PB.ready=true;
+}
+function drawPitchbar(){
+  if(!PB.ready) initPitchbar();
+  const w=pbar.clientWidth||340;
+  const hh=12;
+  const band=f=>((Math.log2(f)-Math.log2(PITCH_MIN))/(Math.log2(PITCH_MAX)-Math.log2(PITCH_MIN)))*w;
+  const hist=A.meterHist;
+  let d='';
+  if(hist.length>1){
+    for(let i=0;i<hist.length;i++){
+      const v=hist[i];
+      let y;
+      if(v===null||v===undefined) y=hh-2;
+      else if(S.input==='volume') y=hh-2-mclamp((v+60)/60,0,1)*(hh-4);
+      else y=hh-2-mclamp((Math.log2(Math.max(20,v)/PITCH_MIN))/(Math.log2(PITCH_MAX/PITCH_MIN)),0,1)*(hh-4);
+      const x=(i/(hist.length-1))*w;
+      d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1);
+    }
+  }
+  PB.hist.setAttribute('d',d);
+  PB.track.setAttribute('width',w);
+  PB.band.setAttribute('x',band(160));
+  PB.band.setAttribute('width',Math.max(0,band(400)-band(160)));
+  PB.ref.setAttribute('x1',band(220)); PB.ref.setAttribute('x2',band(220));
+  let mx=-1,label='';
+  if(S.input==='volume'){
+    const db=A.val===null?-60:A.val;
+    mx=mclamp((db+60)/60,0,1)*w;
+    label=db.toFixed(0)+' dB';
+  }else if(A.hz>0){
+    mx=mclamp((Math.log2(A.hz)-Math.log2(PITCH_MIN))/(Math.log2(PITCH_MAX)-Math.log2(PITCH_MIN)),0,1)*w;
+    label=A.hz.toFixed(1)+' Hz';
+  }
+  if(mx>=0){
+    PB.ptr.setAttribute('opacity','1');
+    PB.ptr.setAttribute('transform','translate('+mx.toFixed(1)+',28)');
+    PB.knob.setAttribute('fill',A.voiceA?'#ff8b5e':'#a99c8a');
+    PB.val.textContent=label;
+    PB.val.setAttribute('x',mclamp(mx,26,w-26));
+  }else{
+    PB.ptr.setAttribute('opacity','0');
+    PB.val.textContent='';
+  }
+  PB.t60.setAttribute('x',2); PB.t60.setAttribute('y',42);
+  PB.t220.setAttribute('x',band(220)); PB.t220.setAttribute('y',42);
+  PB.t1k.setAttribute('x',w-2); PB.t1k.setAttribute('y',42);
+}
+/* The in-game instruments (gate counter + tilt gauge) are SVG elements
+   pinned to the canvas box, so they stay crisp and are never clipped by the
+   canvas edge the way the old canvas-drawn ones were. */
+function updateHud(){
+  /* No progress bar: an endless run has no end to measure against. The
+     headline number is the distance flown, the chip counts the gates. */
+  $('distVal').textContent=Math.floor(G.dist);
+  $('hudGatesTxt').textContent=G.score;
+  const t=mclamp(G.theta,-1,1);
+  const fill=$('hudTiltFill');
+  const half=58;
+  if(t>=0){
+    fill.setAttribute('x',72); fill.setAttribute('width',(half*t).toFixed(1));
+    fill.setAttribute('fill','#3e7d2c');
+  }else{
+    fill.setAttribute('x',(72+half*t).toFixed(1)); fill.setAttribute('width',(-half*t).toFixed(1));
+    fill.setAttribute('fill','#e2574b');
+  }
+  $('hudTiltTxt').textContent='θ '+t.toFixed(2);
+  /* The gate counter belongs to a running game on a GATE track; the canyon is
+     distance-only and the tilt gauge is also useful on the setup screen. */
+  const gateVisible=showsGateCount()&&S.screen!=='home'&&S.screen!=='draw';
+  $('hudGates').classList.toggle('gHide',!gateVisible);
+  $('hud').classList.toggle('gHide',S.screen==='home'||S.screen==='draw');
+}
+function updateReadout(){
+  /* Just the number and its unit. No status captions: the bars and the HUD
+     already show whether the mic is live. */
+  const big=$('hzBig');
+  if(S.input==='volume'){
+    const db=A.val===null?null:A.val;
+    big.innerHTML=(db===null?'--':db.toFixed(0))+'<span class="unit">dB</span>';
+  }else{
+    big.innerHTML=(A.hz>0?A.hz.toFixed(1):'--')+'<span class="unit">Hz</span>';
+  }
+}
+
+/* ============================ home audio tester ============================ */
+/* The home page is not just a poster: once the mic is granted the waveform,
+   Hz/dB number and status all react to the real signal. A level in [0,1]
+   drives the bars; 0 keeps a gentle idle sway so the page still feels alive. */
+function homeAudioLevel(){
+  if(!A.ready) return 0;
+  if(S.input==='volume') return A.val===null?0:mclamp((A.val+60)/60,0,1);
+  return mclamp(A.rms*7,0,1);
+}
+function updateHomeAudio(){
+  const wave=$('homeWave'); if(!wave) return;
+  const lvl=homeAudioLevel();
+  const bars=wave.children||[];
+  for(let i=0;i<bars.length;i++){
+    const sway=Math.sin(performance.now()/260+i*0.9)*0.5+0.5;
+    const h=10+sway*10+lvl*42;
+    bars[i].style.height=Math.round(h)+'px';
+  }
+  wave.classList.toggle('live',lvl>0.02);
+  const val=$('homeHzVal');
+  if(val){
+    if(S.input==='volume') val.textContent=A.val===null?'--':A.val.toFixed(0);
+    else val.textContent=A.hz>0?Math.round(A.hz):'--';
+    const unit=$('homeHzUnit');
+    if(unit) unit.textContent=S.input==='volume'?'dB':'Hz';
+  }
+  const btn=$('btnMicTest');
+  if(btn) btn.classList.toggle('on',A.ready);
+}
+
+/* ============================ networking ============================ */
+/* The hosted share link is gated by a `sharecode` query parameter: requests
+   without it get a 403 from the platform gateway BEFORE they reach our Node
+   server. Every same-origin API call must therefore carry the page's query
+   string through. Locally there is no query string, so this is a no-op. */
+function gateQuery(){
+  const s=location.search;
+  return (s&&s.length>1)?s:'';
+}
+async function api(path,body){
+  const sentAt=Date.now();
+  let res;
+  try{
+    res=await fetch('/api/room/'+path+gateQuery(),{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body||{})
+    });
+  }catch(e){
+    /* offline, DNS failure, or the request was blocked before it left */
+    throw new Error('NETWORK');
+  }
+  let j=null;
+  try{ j=await res.json(); }catch(e){}
+  if(!res.ok||!j||!j.ok){
+    /* A platform gateway may answer with HTML (403) or a login page (200),
+       so there is no JSON error code to read. Keep those distinct from a real
+       server error instead of collapsing every failure into "room failed". */
+    let code=j&&j.error;
+    if(!code){
+      if(res.status===403) code='GATEWAY';
+      else if(res.status>=500) code='HTTP_'+res.status;
+      else code='BAD_REPLY';
+    }
+    throw new Error(code);
+  }
+  if(typeof j.now==='number'){
+    /* server clock minus our clock, corrected by half the round trip so the
+       estimate lands on the moment the server actually stamped the reply */
+    const rtt=Date.now()-sentAt;
+    NET.clockOffset=j.now+Math.round(rtt/2)-Date.now();
+  }
+  return j;
+}
+function errText(code){
+  const map={
+    ROOM_NOT_FOUND:'roomNotFound',ROOM_FULL:'roomFull',ROOM_CLOSED:'roomClosed',
+    NEED_TWO:'needTwo',NOT_READY:'allReady',HOST_ONLY:'needTwo',
+    BAD_TOKEN:'roomToken',
+    NETWORK:'roomBlocked',GATEWAY:'roomBlocked',
+    BAD_REPLY:'roomHttp'
+  };
+  if(map[code]) return map[code];
+  if(/^HTTP_5/.test(code)) return 'roomHttp';
+  if(/^HTTP_/.test(code)) return 'roomBlocked';
+  return map[code]||'roomFail';
+}
+/* Host and guest must agree on the exact gate keys, their spacing, the style
+   and the loop length; otherwise the two devices sample lineAt() at
+   different periods and draw different obstacles. */
+function syncRoomLevel(level){
+  UI.customLine=Array.isArray(level.customLine)&&level.customLine.length>=4
+    ? level.customLine.slice() : null;
+  UI.customStyle=level.customStyle==='spikes'?'spikes':'pipes';
+  UI.customGap=UI.customLine
+    ? mclamp(Number(level.keyGap)||CFG.gapX[S.diff]||CFG.gapX.normal,40,600) : 0;
+  UI.customLoopLen=mclamp(Number(level.loopLen)||CFG.loopLen,CFG.W,CFG.drawMaxLen);
+  G.loopLen=UI.customLine?UI.customLine.length*UI.customGap:0;
+  updateDrawStyleBtn();
+  /* The studio must open on the style that is actually being flown. */
+  UI.drawPreviewStyle=UI.customStyle;
+}
+async function roomCreate(){
+  if(S.track==='custom'&&!UI.customLine){ toast('needDraw','bad'); return; }
+  const src=S.input==='volume'?'volume':'pitch';
+  try{
+    const j=await api('create',{
+      diff:S.diff, source:src,
+      level:{
+        seed:(Date.now()>>>0)||1,
+        customLine:S.track==='custom'?UI.customLine:null,
+        keyGap:S.track==='custom'?UI.customGap:0,
+        track:S.track,
+        customStyle:S.track==='custom'?UI.customStyle:'pipes',
+        loopLen:S.track==='custom'?UI.customLoopLen:CFG.loopLen
+      }
+    });
+    NET.code=j.code;NET.token=j.token;NET.role='A';NET.room=j.room;
+    NET.myReady=false;NET.phase='lobby';NET.online=true;
+    S.mode='duo'; S.input=j.room.source==='volume'?'volume':'pitch';
+    G.seed=j.room.level.seed;
+    syncRoomLevel(j.room.level);
+    syncSeg('segSrc',S.input);
+    syncSeg('segRoomSrc',S.input);
+    startNetLoop();
+    setScreen('room');
+    updateRoomUI();
+    toast('roomWait');
+  }catch(e){ toast(errText(e.message),'bad'); }
+}
+async function roomJoin(code){
+  code=String(code||'').trim().toUpperCase();
+  if(code.length!==6){ toast('roomNotFound','bad'); return; }
+  try{
+    const j=await api('join',{code});
+    NET.code=j.code;NET.token=j.token;NET.role='B';NET.room=j.room;
+    NET.myReady=false;NET.phase='lobby';NET.online=true;
+    S.mode='duo'; S.input=j.room.source==='volume'?'volume':'pitch';
+    G.seed=j.room.level.seed;
+    syncRoomLevel(j.room.level);
+    S.track=j.room.level.customLine?'custom':(j.room.level.track||'random');
+    S.diff=j.room.diff;
+    syncSeg('segTrack',S.track);
+    syncSeg('segRoomTrack',S.track);
+    syncSeg('segDiff2',S.diff);
+    syncSeg('segRoomDiff',S.diff);
+    syncSeg('segSrc',S.input);
+    syncSeg('segRoomSrc',S.input);
+    startNetLoop();
+    setScreen('room');
+    updateRoomUI();
+  }catch(e){ toast(errText(e.message),'bad'); }
+}
+async function roomReady(v){
+  try{
+    const j=await api('ready',{code:NET.code,token:NET.token,ready:v});
+    NET.room=j.room; NET.myReady=v;
+    updateRoomUI();
+  }catch(e){ toast(errText(e.message),'bad'); }
+}
+async function roomStart(){
+  try{
+    const j=await api('start',{code:NET.code,token:NET.token});
+    NET.room=j.room; NET.phase='play';
+    NET.startAt=j.room.startAt; NET.startedAt=j.room.startAt;
+    beginDuo(j.room);
+  }catch(e){ toast(errText(e.message),'bad'); }
+}
+async function roomLeave(){
+  try{ await api('leave',{code:NET.code,token:NET.token}); }catch(e){}
+  NET.code=null;NET.token=null;NET.role=null;NET.room=null;NET.phase='lobby';
+  NET.rx=null;NET.remoteA=0;NET.remoteB=0;NET.hintUntil=0;
+  S.mode='solo';
+  stopNetLoop();
+  setScreen('home');
+}
+/* The host ends the run for BOTH players: /stop flips the server phase back
+   to lobby and every client's poll follows it (exitDuo). */
+async function stopDuo(){
+  try{
+    const j=await api('stop',{code:NET.code,token:NET.token});
+    NET.room=j.room;
+  }catch(e){ toast(errText(e.message),'bad'); return; }
+  NET.phase='lobby';
+  exitDuo();
+}
+function beginDuo(room){
+  S.mode='duo';
+  G.seed=room.level.seed;
+  syncRoomLevel(room.level);
+  S.input=room.source==='volume'?'volume':'pitch';
+  S.track=room.level.customLine?'custom':(room.level.track||'random');
+  S.diff=room.diff;
+  syncSeg('segTrack',S.track);
+  syncSeg('segRoomTrack',S.track);
+  syncSeg('segDiff2',S.diff);
+  syncSeg('segRoomDiff',S.diff);
+  syncSeg('segSrc',S.input);
+  syncSeg('segRoomSrc',S.input);
+  resetGame();
+  S.play='playing';
+  G.calibT=0;
+  UI.paused=false;
+  NET.rx=null;
+  NET.hintUntil=performance.now()+5200;
+  $('ovEnd').classList.remove('show');
+  /* Dedicated game screen: the room card must NOT stay on top of a running
+     duo game (that was the old "guest still sits in the lobby" bug). */
+  setScreen('duo');
+}
+/* Authoritative follow: the server phase is the source of truth for BOTH
+   roles. Back to 'lobby' (the host tapped 回到房间) returns every client to
+   the room screen without a tap. */
+function exitDuo(){
+  S.play='idle';
+  UI.paused=false;
+  NET.startAt=0; NET.startedAt=0; NET.rx=null;
+  NET.remoteA=0; NET.remoteB=0; NET.hintUntil=0;
+  $('ovEnd').classList.remove('show'); $('ovPause').classList.remove('show');
+  buildAttract();
+  setScreen('room');
+  updateRoomUI();
+}
+function updateRoomUI(){
+  /* The room footer has two layers: the entry sheet (track + difficulty +
+     create/join) before a room exists, and the live room card afterwards. */
+  const entry=$('roomEntry'), active=$('roomActive');
+  if(entry&&active){
+    const inRoom=!!NET.code&&!!NET.room;
+    entry.classList.toggle('show',!inRoom);
+    active.classList.toggle('show',inRoom);
+  }
+  const r=NET.room; if(!r) return;
+  $('roomCode').textContent=NET.code||'------';
+  $('pillRole').textContent=NET.role==='A'?tr('roomHost'):tr('roomGuest');
+  const src=r.source==='volume'?'volume':'pitch';
+  $('pillSrc').textContent=tr('lblCtrl')+' · '+tr(src);
+  /* Control briefing: the one place both players read the rules before a
+     run starts (source-aware: pitch or volume). */
+  const brief=tr(src==='volume'?'duoBriefVolume':'duoBriefPitch');
+  const rb=$('roomBrief');
+  if(rb&&rb.textContent!==brief) rb.textContent=brief;
+  const a=r.members.A,b=r.members.B;
+  $('pillA').textContent='A · '+(a.joined?(a.ready?tr('isReady'):tr('joined')):tr('notJoined'));
+  $('pillB').textContent='B · '+(b.joined?(b.ready?tr('isReady'):tr('joined')):tr('notJoined'));
+  $('pillA').className='pill'+(a.ready?' on':'');
+  $('pillB').className='pill'+(b.ready?' on':'');
+  /* Keep the platform `sharecode` (and anything else already in the URL);
+     otherwise the second player's invite link would be rejected with 403. */
+  const share=new URL(location.href);
+  share.searchParams.set('room',NET.code||'');
+  $('shareUrl').textContent=share.toString();
+  const host=NET.role==='A';
+  $('btnRoomStart').style.display=host?'':'none';
+  $('btnReady').style.display=host?'none':'';
+  $('btnReadyTxt').textContent=NET.myReady?tr('notReady'):tr('ready');
+  /* the host can only start once BOTH players are ready */
+  $('btnRoomStart').disabled=host ? !(a.ready&&b.ready) : false;
+  if(host){
+    $('roomHint').innerHTML=(b.joined?'':(tr('roomWait')+'<br>'))+
+      (a.ready&&b.ready?('<span class="ok">'+tr('canStart')+'</span>'):tr('hintRoom'));
+  }else{
+    $('roomHint').innerHTML=(NET.myReady?tr('isReady'):tr('hintRoom'))+
+      (a.ready?' <span class="ok">'+tr('allReady')+'</span>':'');
+  }
+}
+let netTimer=0;
+function startNetLoop(){
+  stopNetLoop();
+  /* 20 Hz is plenty: the host is authoritative locally, the guest
+     interpolates, and a 33ms interval queued overlapping fetches on a phone
+     network. */
+  netTimer=setInterval(netTick,50);
+}
+function stopNetLoop(){ if(netTimer){ clearInterval(netTimer); netTimer=0; } }
+function netTick(){
+  if(!NET.code||!NET.token) return Promise.resolve();
+  /* Never stack requests: on a slow connection the old 33ms timer fired again
+     before the previous round-trip finished, hammering the gateway. */
+  if(NET.busy) return Promise.resolve();
+  NET.busy=true;
+  const body={
+    code:NET.code,token:NET.token,role:NET.role,
+    /* Player B posts the NEGATED value: a higher/louder guest voice must
+       arrive as a negative ctrl so the host's upA-downB formula (ctrlTarget)
+       reads it as downward push. */
+    ctrl:{v:NET.role==='B'?-localCtrl():localCtrl(),hz:A.hz}
+  };
+  if(NET.role==='A'){
+    body.state={x:G.x,y:G.y,theta:G.theta,vy:G.vy,score:G.score,
+      alive:S.play!=='over',dist:G.dist,paused:UI.paused};
+  }
+  return api('sync',body).then(j=>{
+    NET.room=j.room; NET.online=true;
+    NET.remoteA=j.room.ctrl.A?j.room.ctrl.A.v:0;
+    NET.remoteB=j.room.ctrl.B?j.room.ctrl.B.v:0;
+    if(NET.role==='B'&&j.room.state){
+      NET.rx=j.room.state;
+    }
+    const ph=j.room.phase;
+    if(ph==='closed'){ toast('roomClosed','bad'); roomLeave(); return; }
+    if(ph==='play'&&j.room.startAt&&j.room.startAt!==NET.startedAt){
+      /* Authoritative follow: a (re)start on the server pulls BOTH clients
+         into the game - the guest never has to tap anything. */
+      NET.startedAt=j.room.startAt; NET.startAt=j.room.startAt; NET.phase='play';
+      beginDuo(j.room);
+    }else if(ph==='lobby'&&NET.phase==='play'){
+      /* The host ended the run for everyone. */
+      NET.phase='lobby';
+      exitDuo();
+    }else if(NET.phase==='play'&&ph==='play'){
+      /* Partner vanished mid-run: drop back to the room with a message. */
+      const peerIn=NET.role==='A'?j.room.members.B.joined:j.room.members.A.joined;
+      if(!peerIn){ toast('peerLeft','bad'); NET.phase='lobby'; exitDuo(); }
+    }
+    updateRoomUI();
+  }).catch(()=>{
+    if(NET.online){ NET.online=false; toast('offline','bad'); }
+  }).finally(()=>{ NET.busy=false; });
+}
+function localCtrl(){
+  /* Pitch slide is in semitones and volume deviation is in dB, so the
+     conversion has to use the span of the source the room actually chose. */
+  const span=CFG.span[S.input]||CFG.span.pitch;
+  return mclamp(S.gain*A.slide/span,-1,1);
+}
+
+/* ============================ segmented controls ============================ */
+function syncSeg(id,v){
+  const el=$(id); if(!el) return;
+  for(const b of el.querySelectorAll('button')) b.classList.toggle('on',b.dataset.v===v);
+}
+function bindSeg(id,fn){
+  const el=$(id); if(!el) return;
+  el.addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b||!b.dataset.v) return;
+    syncSeg(id,b.dataset.v);
+    fn(b.dataset.v);
+  });
+}
+
+/* ============================ layout ============================ */
+function layout(){
+  const stage=$('stage');
+  /* #app already applies the notch safe-area padding; this extra inset keeps
+     the canvas and its HUD off the screen edges on every device. */
+  const M=12;
+  const cw=Math.max(0,stage.clientWidth-M*2), ch=stage.clientHeight;
+  if(cw<2||ch<2) return;
+  const scale=Math.min(cw/LOG.W,ch/VIEWH);
+  const w=Math.max(80,Math.round(LOG.W*scale)), h=Math.max(120,Math.round(VIEWH*scale));
+  game.style.width=w+'px'; game.style.height=h+'px';
+  game.style.left=(M+Math.round((cw-w)/2))+'px';
+  game.style.top=Math.round((ch-h)/2)+'px';
+  /* The HUD is an SVG overlay pinned to the canvas box, so it scales with the
+     canvas and never spills outside the playable area. */
+  const hud=$('hud');
+  if(hud){
+    hud.style.width=w+'px'; hud.style.height=h+'px';
+    hud.style.left=game.style.left; hud.style.top=game.style.top;
+  }
+  const dpr=Math.min(3,window.devicePixelRatio||1);
+  game.width=Math.round(w*dpr); game.height=Math.round(h*dpr);
+  /* The world is shifted so the visible window sits at the canvas top. */
+  gx.setTransform(dpr*scale,0,0,dpr*scale,0,-dpr*scale*VIEWY0);
+  /* the pitch meter is SVG now: it scales with CSS, no bitmap to resize */
+}
+
+/* ============================ main loop ============================ */
+let lastTs=0, acc=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  const now=ts/1000;
+  const dt=lastTs?Math.min(0.1,now-lastTs):0;
+  lastTs=now;
+  sampleAudio(dt);
+  if(S.screen==='draw'){
+    drawEdgeScroll(dt);
+    if(UI.dirty){ UI.dirty=false; refreshBothLines(); }
+  }
+  const isHost=!(S.mode==='duo'&&NET.role==='B');
+  if(S.play==='idle'&&S.screen==='home'&&S.mode==='solo'){
+    /* attract mode: the world drifts by so the home screen is alive */
+    G.x+=CFG.vx*0.5*dt; G.camX=G.x-CFG.birdX;
+    const w=Math.sin(G.x/150);
+    G.y+=(VIEWY0+VIEWH/2+w*95-G.y)*Math.min(1,dt*1.6);
+    G.theta+=(w*0.34-G.theta)*Math.min(1,dt*2.4);
+    G.vy=0; G.vFall=0;
+  }else if((S.play==='playing'||S.play==='calib')&&isHost&&!UI.paused){
+    if(S.mode==='duo'&&NET.startAt){
+      /* wall-clock driven so host and guest stay in lock-step */
+      const want=Math.max(0,Math.floor((serverNow()-NET.startAt)/1000*MFPS));
+      let n=0;
+      while(G.stepCount<want&&n<10){ step(MDT); G.stepCount++; n++; }
+      if(G.stepCount>=want) acc=0;
+    }else{
+      acc+=dt; let n=0;
+      while(acc>=MDT&&n<5){ step(MDT); acc-=MDT; n++; }
+    }
+  }else acc=0;
+  if(!isHost) applyRemoteState(dt);
+  drawFrame();
+  drawPitchbar();
+  updateHud();
+  updateReadout();
+  updateHomeAudio();
+}
+function applyRemoteState(dt){
+  const rx=NET.rx; if(!rx) return;
+  G.x=rx.x; G.camX=G.x-CFG.birdX;
+  G.y+=(rx.y-G.y)*Math.min(1,dt*14);
+  G.theta+=(rx.theta-G.theta)*Math.min(1,dt*14);
+  G.vy=rx.vy; G.score=rx.score; G.dist=rx.dist;
+  if(rx.alive===false&&S.play!=='over'){
+    S.play='over'; G.over=true;
+    $('endTitle').textContent=tr('crashed'); $('endTitle').style.color='#e2574b';
+    $('endSub').textContent=renderEndSub();
+    updateEndArt();
+    syncOverUI();
+    $('ovEnd').classList.add('show');
+  }
+}
+
+/* ============================ boot ============================ */
+function boot(){
+  layout();
+  window.addEventListener('resize',()=>layout());
+  window.addEventListener('orientationchange',()=>setTimeout(layout,220));
+  /* A saved hand-drawn track is restored before the first frame, so a reload
+     neither loses it nor forgets that it was the selected track. */
+  if(loadStroke()&&UI.savedTrack==='custom'){
+    S.track='custom';
+    syncSeg('segTrack','custom');
+    refreshBothLines();
+    updateDrawStyleBtn();
+  }
+  /* The pen button always carries the live style label, saved stroke or not. */
+  updateDrawStyleBtn();
+
+  /* The corridor - and therefore the drop two neighbouring gates may have -
+     depends on the difficulty. A stroke drawn on Easy is far too steep for
+     Hard, where the very same stroke leaves an opening narrower than the
+     bird (or none at all), so the strip is re-fitted whenever the difficulty
+     changes. */
+  const applyDiff=v=>{
+    S.diff=v;
+    syncSeg('segDiff2',v); syncSeg('segRoomDiff',v);
+    /* Re-fit the saved stroke for the new difficulty: the gate spacing (and
+       with it the opening between two neighbouring gates) is derived from
+       CFG.gapX[diff], so this is the "auto adjust the spacing" step. In a live
+       room the level belongs to the server, so it is left untouched here. */
+    if(!(S.mode==='duo'&&NET.online)){
+      refreshBothLines();
+      updateDrawChrome();
+      if(S.screen==='draw') drawFrame();
+    }
+    if(S.screen==='home') buildAttract();
+  };
+  bindSeg('segDiff2',applyDiff);
+  bindSeg('segRoomDiff',applyDiff);
+  bindSeg('segTrack',v=>{
+    if(v==='custom'){ startDraw(); return; }
+    S.track=v; syncSeg('segTrack',v);
+  /* The pen button carries the style, so it has to be re-labelled too. */
+  syncTrackStyleLabel();
+    if(S.screen==='draw') setScreen('solo');
+    updateDrawChrome();
+  });
+  bindSeg('segRoomTrack',v=>{ S.track=v; syncSeg('segRoomTrack',v); });
+  bindSeg('segSrc',v=>{ S.input=v; syncSeg('segRoomSrc',v); refreshHints(); });
+  bindSeg('segRoomSrc',v=>{ S.input=v; syncSeg('segSrc',v); refreshHints(); });
+
+  $('btnSolo').addEventListener('click',async()=>{
+    S.mode='solo';
+    setScreen('solo');
+    if(!A.ready) await enableMic();
+  });
+  /* "Two players" opens the room ENTRY sheet first: track + difficulty are
+     chosen before a room is ever created, matching the solo flow. While
+     DUO_ENABLED is false the entry only shows the devSoon toast. */
+  $('btnRoom').addEventListener('click',async()=>{
+    if(!DUO_ENABLED){ toast('devSoon','bad'); return; }
+    S.mode='duo';
+    setScreen('room');
+    if(!A.ready) await enableMic();
+  });
+  $('btnCreateNow').addEventListener('click',async()=>{
+    if(!A.ready) await enableMic();
+    await roomCreate();
+  });
+  $('btnBack').addEventListener('click',()=>{
+    /* Inside a room the back button is a real leave: the partner must see it. */
+    if(S.mode==='duo'&&NET.code){ roomLeave(); return; }
+    S.play='idle'; S.mode='solo'; UI.paused=false;
+    $('ovEnd').classList.remove('show'); $('ovPause').classList.remove('show');
+    buildAttract();
+    setScreen('home');
+  });
+  $('btnMicTest').addEventListener('click',async()=>{
+    if(!A.ready) await enableMic();
+    if(A.ready) toast('micOn','good');
+  });
+  $('btnShowJoin').addEventListener('click',()=>{
+    const r=$('joinRow');
+    r.style.display=r.style.display==='none'?'flex':'none';
+  });
+  $('btnJoin').addEventListener('click',async()=>{
+    if(!A.ready) await enableMic();
+    await roomJoin($('joinCode').value);
+  });
+  $('joinCode').addEventListener('keydown',e=>{ if(e.key==='Enter') $('btnJoin').click(); });
+  $('btnReady').addEventListener('click',()=>roomReady(!NET.myReady));
+  $('btnRoomStart').addEventListener('click',()=>roomStart());
+  $('btnLeave').addEventListener('click',()=>roomLeave());
+  $('btnCopy').addEventListener('click',async()=>{
+    const url=$('shareUrl').textContent;
+    try{
+      if(navigator.clipboard&&window.isSecureContext) await navigator.clipboard.writeText(url);
+      else{
+        const ta=document.createElement('textarea');
+        ta.value=url; ta.style.position='fixed'; ta.style.opacity='0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+      }
+      toast('copied','good');
+    }catch(e){ toast('copyFail','bad'); }
+  });
+
+  $('btnMain').addEventListener('click',async()=>{
+    if(S.screen==='solo'&&(S.play==='playing'||S.play==='calib')){
+      UI.paused=true; S.play='paused';
+      $('ovPause').classList.add('show');
+      syncPlayUI();
+      return;
+    }
+    if(S.play==='paused'){ resumeGame(); return; }
+    if(S.screen==='solo'){ if(!A.ready) await enableMic(); startGame(); }
+  });
+  $('btnResume').addEventListener('click',resumeGame);
+  $('btnRestart').addEventListener('click',()=>{ UI.paused=false; $('ovPause').classList.remove('show'); startGame(); });
+  $('btnAgain').addEventListener('click',()=>{
+    UI.paused=false;
+    if(S.mode==='duo'){
+      /* Host-driven end of run: one tap sends BOTH players back to the room
+         (the guest follows the lobby phase in netTick). */
+      if(NET.role==='A') stopDuo();
+      return;
+    }
+    startGame();
+  });
+  $('btnHome').addEventListener('click',()=>{
+    /* Leaving from a live room must also tell the server, or the partner
+       would keep polling a room nobody is in. */
+    if(S.mode==='duo'&&NET.code){ roomLeave(); return; }
+    S.play='idle'; S.mode='solo'; UI.paused=false;
+    $('ovEnd').classList.remove('show'); $('ovPause').classList.remove('show');
+    buildAttract();
+    setScreen('home');
+  });
+  $('btnMicRetry').addEventListener('click',async()=>{ UI.micLater=false; await enableMic(); });
+  $('btnMicLater').addEventListener('click',()=>{ UI.micLater=true; setScreen(S.screen); });
+  $('btnLang').addEventListener('click',()=>{
+    LANG=LANG==='zh'?'en':'zh';
+    document.documentElement.lang=LANG==='zh'?'zh-CN':'en';
+    applyI18n();
+    setScreen(S.screen);
+  });
+
+  $('btnUndo').addEventListener('click',()=>{
+    /* One-level undo: restore the stroke exactly as it was before the last
+       gesture began. Without a snapshot there is nothing to go back to, and
+       undoing mid-draw would fight the live pointer. */
+    if(!UI.drawUndo||UI.drawing) return;
+    UI.drawPts=UI.drawUndo;
+    UI.drawUndo=null;
+    UI.smoothedUpTo=UI.drawPts.length;
+    UI.freshFrom=null;
+    refreshBothLines();
+    saveStroke();
+    updateDrawChrome();
+    drawFrame();
+  });
+  $('btnClear').addEventListener('click',()=>{
+    /* The only way to throw a saved track away: clear the memory copy AND the
+       stored one, otherwise 清空 would come back on the next visit. */
+    UI.drawPts=[]; UI.smoothedUpTo=0; clearStroke(); refreshBothLines(); updateDrawChrome(); drawFrame();
+  });
+  /* Toggling reads the CHOSEN style, not the alias: the alias is only kept
+     for compatibility and can never be the source of truth. */
+  $('btnDrawStyle').addEventListener('click',()=>setDrawStyle(UI.customStyle==='spikes'?'pipes':'spikes'));
+  $('btnExtend').addEventListener('click',()=>{
+    extendDraw(UI.drawLen+LOG.W);
+    UI.drawScroll=drawViewportMax(); updateDrawChrome(); drawFrame();
+  });
+  $('btnDrawPrev').addEventListener('click',()=>scrollDraw(-LOG.W));
+  $('btnDrawNext').addEventListener('click',()=>scrollDraw(LOG.W));
+  $('drawSeek').addEventListener('input',e=>{
+    UI.drawScroll=mclamp(Number(e.target.value)||0,0,drawViewportMax());
+    updateDrawChrome(); drawFrame();
+  });
+  $('btnRand').addEventListener('click',()=>{
+    randomDrawLine();
+    toast('randDone','good');
+  });
+  $('btnDone').addEventListener('click',finishDraw);
+  game.addEventListener('pointerdown',onPointerDown);
+  game.addEventListener('pointermove',onPointerMove);
+  game.addEventListener('pointerup',onPointerUp);
+  game.addEventListener('pointercancel',onPointerUp);
+
+  applyI18n();
+  buildAttract();
+  setScreen('home');
+
+  const q=new URLSearchParams(location.search);
+  const rc=(q.get('room')||'').trim().toUpperCase();
+  if(rc.length===6){
+    /* Invite link: prefill the code, reveal the join row, and join straight
+       away. If joining fails the entry sheet is already in a usable state.
+       While DUO_ENABLED is false a stale link must not create a session:
+       it just shows the devSoon toast and stays on home. */
+    if(DUO_ENABLED){
+      const jc=$('joinCode'); if(jc) jc.value=rc;
+      const jr=$('joinRow'); if(jr) jr.style.display='flex';
+      S.mode='duo';
+      setScreen('room');
+      /* The mic MUST come up for an invite-link guest too, otherwise the guest
+         sits in the room publishing a constant zero. */
+      roomJoin(rc).then(()=>{ if(NET.code&&!A.ready) enableMic(); });
+    }else{
+      toast('devSoon','bad');
+    }
+  }
+
+  requestAnimationFrame(loop);
+}
+function resumeGame(){
+  UI.paused=false; $('ovPause').classList.remove('show');
+  S.play='playing';
+  syncPlayUI();
+}
+function applyI18n(){
+  for(const el of document.querySelectorAll('[data-i18n]')){
+    const v=tr(el.dataset.i18n);
+    /* A button may carry an SVG icon next to its label. Writing textContent
+       on the button itself would delete the glyph, so the label span is
+       updated instead when one exists. */
+    if(el.tagName==='BUTTON'&&el.classList.contains('btn')){
+      const span=el.querySelector('span');
+      if(span) span.textContent=v; else el.textContent=v;
+    }
+    else if(el.namespaceURI==='http://www.w3.org/2000/svg') el.textContent=v;
+    else el.innerHTML=v;
+  }
+  for(const el of document.querySelectorAll('[data-i18n-ph]')) el.placeholder=tr(el.dataset.i18nPh);
+  $('distLbl').textContent=tr('dist');
+  $('langTxt').textContent=LANG==='zh'?'EN':'中';
+  /* the main button label is derived from the run state, so it must be
+     recomputed after a language switch */
+  syncMainBtn();
+  /* these two are written outside the i18n pass, so refresh them explicitly */
+  $('micLabel').textContent=A.micState==='on'?tr('micOn')
+    : A.micState==='blocked'?tr('micBlocked'):tr('micHint');
+  if(S.play!=='over') $('endTitle').textContent=tr('crashed');
+  /* result overlay text is generated at runtime, not via data-i18n */
+  if(G.over){
+    $('endTitle').textContent=tr('crashed');
+    $('endTitle').style.color='#e2574b';
+    $('endSub').textContent=renderEndSub();
+    updateEndArt();
+  }
+  updateReadout();
+  refreshHints();
+  /* The over overlay's action depends on the role, not on a data-i18n key. */
+  syncOverUI();
+  /* The pen button label is built from the style, not from a data-i18n key,
+     so it has to be rebuilt after a language switch. */
+  syncTrackStyleLabel();
+  if(UI_T.key) renderToast();
+}
+boot();
+</script>
+</body>
+</html>
